@@ -195,7 +195,7 @@ function DragonMartLogo() {
 /** ---------------------------------------------
  * Demo data (replace with DB later)
  * ----------------------------------------------*/
-const CATEGORIES = ["All", "Electronics", "Home", "Fashion", "Beauty", "Sports", "Books"];
+const CATEGORIES = ["All", "Electronics", "Home", "Fashion", "Auto Spare Parts", "Sports", "Luggage and Bags"];
 
 const DEMO_PRODUCTS = [
   {
@@ -249,7 +249,7 @@ const DEMO_PRODUCTS = [
   {
     id: "p5",
     title: "Hydrating Face Moisturizer (50ml)",
-    category: "Beauty",
+    category: "Auto Spare Parts",
     price: 79,
     rating: 4.5,
     reviews: 14220,
@@ -273,7 +273,7 @@ const DEMO_PRODUCTS = [
   {
     id: "p7",
     title: "Bestselling Novel: Paperback Edition",
-    category: "Books",
+    category: "Luggage & Bags",
     price: 39,
     rating: 4.7,
     reviews: 20155,
