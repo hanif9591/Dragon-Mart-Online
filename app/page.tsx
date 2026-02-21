@@ -195,7 +195,17 @@ function DragonMartLogo() {
 /** ---------------------------------------------
  * Demo data (replace with DB later)
  * ----------------------------------------------*/
-const CATEGORIES = ["All", "Electronics", "Home", "Fashion", "Auto Spare Parts", "Sports", "Luggage and Bags"];
+const CATEGORIES = [
+  "All",
+  "Electronics",
+  "Home",
+  "Fashion",
+  "Beauty",
+  "Sports",
+  "Books",
+  "Auto Spare Parts",
+  "Toys and Games",
+];
 
 const DEMO_PRODUCTS = [
   {
@@ -949,6 +959,165 @@ function AdminPanel({
   const [imgUrl, setImgUrl] = useState(
     "https://images.unsplash.com/photo-1518441902117-f0a9e9f8d1d4?auto=format&fit=crop&w=1200&q=60"
   );
+  function AdminPage({ products, onCreateProduct, onDeleteProduct }) {
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("Electronics");
+  const [price, setPrice] = useState(99);
+  const [stock, setStock] = useState(10);
+  const [prime, setPrime] = useState(true);
+
+  const [imgUrl, setImgUrl] = useState("https://images.unsplash.com/photo-1518441902117-f0a9e9f8d1d4?auto=format&fit=crop&w=1200&q=60");
+
+  const [extraImages, setExtraImages] = useState([]); // ✅ multiple
+  const [videos, setVideos] = useState([]);           // ✅ multiple
+  const [desc, setDesc] = useState("New product description...");
+
+  function addImageField() { setExtraImages((xs) => [...xs, ""]); }
+  function updateImageField(i, v) { setExtraImages((xs) => xs.map((x, idx) => (idx === i ? v : x))); }
+  function removeImageField(i) { setExtraImages((xs) => xs.filter((_, idx) => idx !== i)); }
+
+  function addVideoField() { setVideos((xs) => [...xs, ""]); }
+  function updateVideoField(i, v) { setVideos((xs) => xs.map((x, idx) => (idx === i ? v : x))); }
+  function removeVideoField(i) { setVideos((xs) => xs.filter((_, idx) => idx !== i)); }
+
+  function submit() {
+    if (!title.trim()) return;
+
+    const cleanedImages = [imgUrl, ...extraImages].map((s) => (s || "").trim()).filter(Boolean);
+    const cleanedVideos = videos.map((s) => (s || "").trim()).filter(Boolean);
+
+    onCreateProduct({
+      id: `p_${Math.random().toString(16).slice(2)}`,
+      title,
+      category,
+      price: Number(price),
+      rating: 4.4,
+      reviews: 0,
+      prime,
+      stock: Number(stock),
+      img: imgUrl,
+      images: cleanedImages,   // ✅ multiple pictures
+      videos: cleanedVideos,   // ✅ multiple videos
+      desc,
+    });
+
+    setTitle("");
+    setExtraImages([]);
+    setVideos([]);
+  }
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 pt-6 pb-12">
+      <div className="mt-5 grid lg:grid-cols-2 gap-4">
+
+        {/* LEFT: FORM */}
+        <div className="rounded-3xl border bg-white p-5 space-y-3">
+          <div className="text-2xl font-black">Admin — Product Upload</div>
+
+          <div>
+            <div className="text-sm font-semibold">Title</div>
+            <input className="w-full border rounded-2xl p-2" value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-sm font-semibold">Category</div>
+              <select className="w-full border rounded-2xl p-2" value={category} onChange={(e) => setCategory(e.target.value)}>
+                {CATEGORIES.filter((c) => c !== "All").map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <div className="text-sm font-semibold">Price (AED)</div>
+              <input type="number" className="w-full border rounded-2xl p-2" value={price} onChange={(e) => setPrice(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-sm font-semibold">Stock</div>
+              <input type="number" className="w-full border rounded-2xl p-2" value={stock} onChange={(e) => setStock(e.target.value)} />
+            </div>
+            <label className="flex items-center gap-2 pt-7">
+              <input type="checkbox" checked={prime} onChange={(e) => setPrime(e.target.checked)} />
+              Prime
+            </label>
+          </div>
+
+          <div>
+            <div className="text-sm font-semibold">Main Image URL</div>
+            <input className="w-full border rounded-2xl p-2" value={imgUrl} onChange={(e) => setImgUrl(e.target.value)} />
+          </div>
+
+          {/* ✅ Multiple Pictures */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold">More Pictures</div>
+              <button onClick={addImageField} className="px-3 py-2 rounded-2xl bg-red-600 text-white">
+                + Add Picture
+              </button>
+            </div>
+
+            {extraImages.map((val, i) => (
+              <div key={i} className="flex gap-2">
+                <input className="w-full border rounded-2xl p-2" placeholder="https://...jpg" value={val} onChange={(e) => updateImageField(i, e.target.value)} />
+                <button onClick={() => removeImageField(i)} className="px-3 py-2 rounded-2xl border">Remove</button>
+              </div>
+            ))}
+          </div>
+
+          {/* ✅ Multiple Videos */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold">Videos (YouTube / mp4)</div>
+              <button onClick={addVideoField} className="px-3 py-2 rounded-2xl bg-red-600 text-white">
+                + Add Video
+              </button>
+            </div>
+
+            {videos.map((val, i) => (
+              <div key={i} className="flex gap-2">
+                <input className="w-full border rounded-2xl p-2" placeholder="https://youtube.com/watch?v=... or https://...mp4" value={val} onChange={(e) => updateVideoField(i, e.target.value)} />
+                <button onClick={() => removeVideoField(i)} className="px-3 py-2 rounded-2xl border">Remove</button>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <div className="text-sm font-semibold">Description</div>
+            <textarea className="w-full border rounded-2xl p-2 min-h-24" value={desc} onChange={(e) => setDesc(e.target.value)} />
+          </div>
+
+          <button onClick={submit} className="w-full py-3 rounded-2xl bg-red-600 text-white font-bold">
+            Create product
+          </button>
+        </div>
+
+        {/* RIGHT: Preview */}
+        <div className="rounded-3xl border bg-white p-5">
+          <div className="font-black">Catalog preview</div>
+          <div className="text-sm text-gray-500">Total products: {products.length}</div>
+
+          <div className="mt-3 space-y-2">
+            {products.slice(0, 8).map((p) => (
+              <div key={p.id} className="flex items-center gap-3 border rounded-2xl p-3">
+                <button onClick={() => onDeleteProduct(p.id)} className="text-red-600 text-xs font-bold">Delete</button>
+                <img src={p.img} className="h-12 w-12 rounded-2xl object-cover" />
+                <div className="flex-1">
+                  <div className="font-semibold">{p.title}</div>
+                  <div className="text-xs text-gray-500">{p.category} • {formatMoneyAED(p.price)}</div>
+                  <div className="text-[11px] text-gray-500">
+                    {(p.images?.length || 0)} photos • {(p.videos?.length || 0)} videos
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
   const [desc, setDesc] = useState("New product description...");
 
   function submit() {
