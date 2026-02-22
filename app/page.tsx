@@ -19,191 +19,65 @@ import {
   Package,
   Settings,
   Upload,
-  Play,
 } from "lucide-react";
 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+
 /**
- * ✅ NO shadcn imports (so "Cannot find module '@/components/ui/...'" error will not happen)
- * ✅ Works with Tailwind only
- * ✅ Admin: add/delete product
- * ✅ Product: multiple images + multiple videos
- * ✅ Cart + Orders + Login demo
+ * Dragon Mart Online — demo storefront (front-end only)
+ * ✅ Add products from Admin
+ * ✅ Multiple pictures + multiple videos per product
+ * ✅ Delete product
+ * ✅ New category added: Luggage and Bags
+ * ✅ Owner Admin credentials + extra admin approval (demo/localStorage)
  */
 
-/* ------------------ tiny utils ------------------ */
-function cn(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
-
-function formatMoneyAED(n: number) {
-  return n.toLocaleString(undefined, { style: "currency", currency: "AED" });
-}
-
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
-/* ------------------ UI primitives (Tailwind only) ------------------ */
-function Button({
-  children,
-  className,
-  variant = "primary",
-  size = "md",
-  ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost" | "danger";
-  size?: "sm" | "md" | "icon";
-}) {
-  const base =
-    "inline-flex items-center justify-center gap-2 font-semibold transition rounded-2xl select-none disabled:opacity-50 disabled:cursor-not-allowed";
-  const sizes =
-    size === "icon"
-      ? "h-10 w-10"
-      : size === "sm"
-      ? "h-9 px-3 text-sm"
-      : "h-10 px-4 text-sm";
-  const variants =
-    variant === "secondary"
-      ? "bg-white/15 text-white hover:bg-white/20"
-      : variant === "ghost"
-      ? "bg-transparent hover:bg-black/5 text-black"
-      : variant === "danger"
-      ? "bg-red-600 text-white hover:bg-red-700"
-      : "bg-red-700 text-white hover:bg-orange-600";
-  return (
-    <button className={cn(base, sizes, variants, className)} {...props}>
-      {children}
-    </button>
-  );
-}
-
-function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      className={cn(
-        "h-10 w-full rounded-2xl border border-black/10 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-orange-400",
-        className
-      )}
-      {...props}
-    />
-  );
-}
-
-function Card({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <div className={cn("rounded-3xl border border-black/10 bg-white shadow-sm", className)}>{children}</div>;
-}
-function CardHeader({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <div className={cn("p-5 pb-3", className)}>{children}</div>;
-}
-function CardTitle({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <div className={cn("text-base font-black", className)}>{children}</div>;
-}
-function CardContent({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <div className={cn("p-5 pt-0", className)}>{children}</div>;
-}
-
-function Badge({
-  children,
-  variant = "default",
-  className,
-}: {
-  children: React.ReactNode;
-  variant?: "default" | "secondary" | "destructive";
-  className?: string;
-}) {
-  const v =
-    variant === "secondary"
-      ? "bg-black/5 text-black"
-      : variant === "destructive"
-      ? "bg-red-600 text-white"
-      : "bg-orange-600 text-white";
-  return <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold", v, className)}>{children}</span>;
-}
-
-/* ------------------ Modal + Drawer ------------------ */
-function Modal({
-  open,
-  onClose,
-  title,
-  children,
-  widthClass = "max-w-md",
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-  widthClass?: string;
-}) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="absolute inset-0 grid place-items-center p-4">
-        <div className={cn("w-full rounded-3xl bg-white shadow-xl", widthClass)}>
-          <div className="flex items-center justify-between border-b border-black/10 px-5 py-4">
-            <div className="text-lg font-black">{title}</div>
-            <button className="h-10 w-10 grid place-items-center rounded-2xl hover:bg-black/5" onClick={onClose}>
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-          <div className="p-5">{children}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Drawer({
-  open,
-  onClose,
-  title,
-  children,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={cn("fixed inset-0 z-50", open ? "" : "pointer-events-none")}>
-      <div className={cn("absolute inset-0 bg-black/40 transition", open ? "opacity-100" : "opacity-0")} onClick={onClose} />
-      <div
-        className={cn(
-          "absolute right-0 top-0 h-full w-full sm:w-[420px] bg-white shadow-2xl transition-transform",
-          open ? "translate-x-0" : "translate-x-full"
-        )}
-      >
-        <div className="flex items-center justify-between border-b border-black/10 px-5 py-4">
-          <div className="text-lg font-black">{title}</div>
-          <button className="h-10 w-10 grid place-items-center rounded-2xl hover:bg-black/5" onClick={onClose}>
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="p-5 overflow-auto h-[calc(100%-72px)]">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------ Brand ------------------ */
 function DragonMartLogo({ className = "h-9 w-9" }: { className?: string }) {
   return (
-    <div className={cn("rounded-2xl bg-white/10 grid place-items-center", className)}>
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <div className={`rounded-2xl bg-white/10 grid place-items-center ${className}`}>
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
         <path
           d="M6 14c2.8-5.6 7.2-8.4 12-9-1.2 2.6-1.8 4.9-1.8 7.2C16.2 17 12.3 20 8.3 20c-2 0-3.6-0.7-4.3-2.1-.5-1 .2-2.6 2-3.9Z"
           stroke="currentColor"
           strokeWidth="1.6"
           strokeLinejoin="round"
         />
-        <path d="M10.2 10.5c.8-1.4 2.1-2.7 3.8-3.8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-        <path d="M16.8 12.2c.8.4 1.4 1 1.8 1.8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path
+          d="M10.2 10.5c.8-1.4 2.1-2.7 3.8-3.8"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+        <path
+          d="M16.8 12.2c.8.4 1.4 1 1.8 1.8"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
       </svg>
     </div>
   );
 }
 
-/* ------------------ Data ------------------ */
 const CATEGORIES = [
   "All",
   "Electronics",
@@ -214,6 +88,7 @@ const CATEGORIES = [
   "Books",
   "Auto Spare Parts",
   "Toys and Games",
+  "Luggage and Bags",
 ];
 
 type Product = {
@@ -240,6 +115,79 @@ type Order = {
   userEmail: string;
 };
 
+// ----------------- Admin auth (DEMO) -----------------
+// ⚠️ প্রোডাকশনে এভাবে password রাখবেন না (frontend/localStorage insecure).
+// Backend + env + bcrypt hashing ব্যবহার করুন।
+const OWNER_ADMIN_EMAIL = "hanif9591@gmail.com";
+const OWNER_ADMIN_PASSWORD = "Aliza9591#";
+
+type LocalUser = { name: string; email: string; password: string };
+type AdminRequest = { email: string; name: string; createdAt: string };
+
+function readJSON<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJSON(key: string, value: any) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+
+function getUsers(): Record<string, LocalUser> {
+  return readJSON<Record<string, LocalUser>>("dmo_users", {});
+}
+
+function saveUser(u: LocalUser) {
+  const users = getUsers();
+  users[u.email.toLowerCase()] = u;
+  writeJSON("dmo_users", users);
+}
+
+function getApprovedAdmins(): string[] {
+  return readJSON<string[]>("dmo_admin_approved", []);
+}
+
+function approveAdmin(email: string) {
+  const e = email.toLowerCase();
+  const list = Array.from(new Set([...getApprovedAdmins(), e]));
+  writeJSON("dmo_admin_approved", list);
+}
+
+function removeApprovedAdmin(email: string) {
+  const e = email.toLowerCase();
+  writeJSON(
+    "dmo_admin_approved",
+    getApprovedAdmins().filter((x) => x !== e)
+  );
+}
+
+function getAdminRequests(): AdminRequest[] {
+  return readJSON<AdminRequest[]>("dmo_admin_requests", []);
+}
+
+function addAdminRequest(req: AdminRequest) {
+  const list = getAdminRequests();
+  const e = req.email.toLowerCase();
+  if (list.some((r) => r.email.toLowerCase() === e)) return; // duplicate avoid
+  list.unshift({ ...req, email: e });
+  writeJSON("dmo_admin_requests", list);
+}
+
+function removeAdminRequest(email: string) {
+  const e = email.toLowerCase();
+  writeJSON(
+    "dmo_admin_requests",
+    getAdminRequests().filter((r) => r.email.toLowerCase() !== e)
+  );
+}
+// -----------------------------------------------------
+
 const DEMO_PRODUCTS: Product[] = [
   {
     id: "p1",
@@ -253,7 +201,8 @@ const DEMO_PRODUCTS: Product[] = [
     img: "https://images.unsplash.com/photo-1518441902117-f0a9e9f8d1d4?auto=format&fit=crop&w=1200&q=60",
     images: ["https://images.unsplash.com/photo-1518441902117-f0a9e9f8d1d4?auto=format&fit=crop&w=1200&q=60"],
     videos: [],
-    desc: "Immersive sound, all-day comfort, and adaptive noise cancelling for work, travel, and everything in between.",
+    desc:
+      "Immersive sound, all-day comfort, and adaptive noise cancelling for work, travel, and everything in between.",
   },
   {
     id: "p2",
@@ -267,7 +216,8 @@ const DEMO_PRODUCTS: Product[] = [
     img: "https://images.unsplash.com/photo-1559245010-6564f5d4f8c5?auto=format&fit=crop&w=1200&q=60",
     images: ["https://images.unsplash.com/photo-1559245010-6564f5d4f8c5?auto=format&fit=crop&w=1200&q=60"],
     videos: [],
-    desc: "Sync colors to your mood. Voice control, scenes, and easy setup for bedrooms, desks, and gaming rooms.",
+    desc:
+      "Sync colors to your mood. Voice control, scenes, and easy setup for bedrooms, desks, and gaming rooms.",
   },
   {
     id: "p3",
@@ -279,31 +229,36 @@ const DEMO_PRODUCTS: Product[] = [
     prime: false,
     stock: 120,
     img: "https://images.unsplash.com/photo-1526401485004-2fda9f6d3d38?auto=format&fit=crop&w=1200&q=60",
-    images: ["https://images.unsplash.com/photo-1526401485004-2fda9e9f6d3d38?auto=format&fit=crop&w=1200&q=60".replace("2fda9e9", "2fda9f6")],
+    images: ["https://images.unsplash.com/photo-1526401485004-2fda9f6d3d38?auto=format&fit=crop&w=1200&q=60"],
     videos: [],
-    desc: "Double-wall insulation keeps drinks cold for up to 24h. Leak-proof cap and durable powder coat.",
+    desc:
+      "Double-wall insulation keeps drinks cold for up to 24h. Leak-proof cap and durable powder coat.",
   },
 ];
 
-/* ------------------ Small components ------------------ */
+function formatMoneyAED(n: number) {
+  return n.toLocaleString(undefined, { style: "currency", currency: "AED" });
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
 function Stars({ value }: { value: number }) {
   const full = Math.floor(value);
   const half = value - full >= 0.5;
-  return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: 5 }, (_, i) => {
-        const idx = i + 1;
-        const filled = idx <= full || (idx === full + 1 && half);
-        return (
-          <Star
-            key={i}
-            className={cn("h-4 w-4", filled ? "" : "opacity-30")}
-            fill={filled ? "currentColor" : "none"}
-          />
-        );
-      })}
-    </div>
-  );
+  const stars = Array.from({ length: 5 }, (_, i) => {
+    const idx = i + 1;
+    const filled = idx <= full || (idx === full + 1 && half);
+    return (
+      <Star
+        key={i}
+        className={`h-4 w-4 ${filled ? "" : "opacity-30"}`}
+        fill={filled ? "currentColor" : "none"}
+      />
+    );
+  });
+  return <div className="flex items-center gap-0.5">{stars}</div>;
 }
 
 function useSession() {
@@ -325,24 +280,160 @@ function useSession() {
   return { session, setSession };
 }
 
-function toYouTubeEmbed(url: string) {
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) {
-      const id = u.pathname.replace("/", "");
-      return id ? `https://www.youtube.com/embed/${id}` : null;
-    }
-    if (u.hostname.includes("youtube.com")) {
-      const id = u.searchParams.get("v");
-      return id ? `https://www.youtube.com/embed/${id}` : null;
-    }
-    return null;
-  } catch {
-    return null;
-  }
+function TopNav({
+  query,
+  setQuery,
+  category,
+  setCategory,
+  cartCount,
+  onOpenCart,
+  page,
+  setPage,
+  session,
+  onOpenAuth,
+  onLogout,
+}: {
+  query: string;
+  setQuery: (v: string) => void;
+  category: string;
+  setCategory: (v: string) => void;
+  cartCount: number;
+  onOpenCart: () => void;
+  page: string;
+  setPage: (v: string) => void;
+  session: any;
+  onOpenAuth: () => void;
+  onLogout: () => void;
+}) {
+  return (
+    <div className="sticky top-0 z-40">
+      <div className="bg-gradient-to-r from-red-700 via-red-600 to-orange-500 text-white">
+        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-3">
+          <button onClick={() => setPage("home")} className="flex items-center gap-2">
+            <DragonMartLogo />
+            <div className="leading-tight text-left">
+              <div className="font-black tracking-tight">Dragon Mart Online</div>
+              <div className="text-xs text-white/70">Deliver to UAE</div>
+            </div>
+          </button>
+
+          <div className="flex-1 flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary" className="rounded-2xl bg-white/15 hover:bg-white/20 text-white">
+                  <span className="text-sm">{category}</span>
+                  <ChevronDown className="h-4 w-4 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                {CATEGORIES.map((c) => (
+                  <DropdownMenuItem
+                    key={c}
+                    onClick={() => {
+                      setCategory(c);
+                      setPage("home");
+                    }}
+                    className={c === category ? "font-semibold" : ""}
+                  >
+                    {c}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <div className="relative w-full">
+              <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-70" />
+              <Input
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setPage("home");
+                }}
+                placeholder="Search products, brands and more"
+                className="pl-9 rounded-2xl bg-white text-black"
+              />
+            </div>
+          </div>
+
+          <Button onClick={onOpenCart} variant="secondary" className="relative rounded-2xl bg-white/15 hover:bg-white/20 text-white">
+            <ShoppingCart className="h-4 w-4" />
+            <span className="ml-2 hidden sm:inline">Cart</span>
+            {cartCount > 0 && (
+              <span className="absolute -top-2 -right-2 h-5 min-w-5 px-1 rounded-full bg-white text-zinc-900 text-xs grid place-items-center font-bold">
+                {cartCount}
+              </span>
+            )}
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary" className="rounded-2xl bg-white/15 hover:bg-white/20 text-white">
+                <User className="h-4 w-4" />
+                <span className="ml-2 hidden sm:inline">{session ? session.name : "Account"}</span>
+                <ChevronDown className="h-4 w-4 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {!session ? (
+                <DropdownMenuItem onClick={onOpenAuth}>
+                  <User className="h-4 w-4 mr-2" /> Login / Signup
+                </DropdownMenuItem>
+              ) : (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => setPage("orders")}
+                    className={page === "orders" ? "font-semibold" : ""}
+                  >
+                    <Package className="h-4 w-4 mr-2" /> Orders
+                  </DropdownMenuItem>
+
+                  {(session.role === "admin" || session.role === "owner") && (
+                    <DropdownMenuItem
+                      onClick={() => setPage("admin")}
+                      className={page === "admin" ? "font-semibold" : ""}
+                    >
+                      <Settings className="h-4 w-4 mr-2" /> Admin
+                    </DropdownMenuItem>
+                  )}
+
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onLogout}>
+                    <LogOut className="h-4 w-4 mr-2" /> Logout
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      <div className="bg-red-800 text-white/90 border-b border-red-700">
+        <div className="mx-auto max-w-6xl px-4 py-2 flex items-center gap-2 overflow-x-auto">
+          {CATEGORIES.map((c) => (
+            <button
+              key={c}
+              onClick={() => {
+                setCategory(c);
+                setPage("home");
+              }}
+              className={`whitespace-nowrap text-sm px-3 py-1 rounded-2xl transition ${
+                c === category ? "bg-white/15 text-white" : "hover:bg-white/10"
+              }`}
+            >
+              {c}
+            </button>
+          ))}
+          <div className="ml-auto hidden md:flex items-center gap-4 text-xs">
+            <div className="flex items-center gap-1"><Truck className="h-4 w-4" /> Fast delivery</div>
+            <div className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Secure payments</div>
+            <div className="flex items-center gap-1"><RotateCcw className="h-4 w-4" /> Easy returns</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-/* ------------------ Pages/Views ------------------ */
 function Hero({ onShop }: { onShop: () => void }) {
   return (
     <div className="mx-auto max-w-6xl px-4 pt-6">
@@ -357,7 +448,7 @@ function Hero({ onShop }: { onShop: () => void }) {
               Dragon Mart Online — shop smart, save big.
             </h1>
             <p className="mt-3 text-white/80">
-              Amazon-style UI (demo). Search, filters, cart, login, orders, admin upload.
+              Amazon-style UI with search, filters, cart, login, orders, and admin upload.
             </p>
             <div className="mt-5 flex gap-2">
               <Button onClick={onShop} className="rounded-2xl bg-white text-zinc-900 hover:bg-white/90">
@@ -394,173 +485,50 @@ function ProductCard({
   onAdd: (p: Product) => void;
 }) {
   return (
-    <Card className="rounded-3xl overflow-hidden">
-      <div className="relative">
-        <img src={p.img} alt={p.title} className="h-44 w-full object-cover" loading="lazy" />
-        <div className="absolute top-3 left-3 flex gap-2">
-          {p.prime && <Badge className="rounded-full">Prime</Badge>}
-          {p.stock <= 10 && <Badge variant="destructive" className="rounded-full">Low stock</Badge>}
+    <motion.div layout>
+      <Card className="rounded-3xl overflow-hidden shadow-sm">
+        <div className="relative">
+          <img src={p.img} alt={p.title} className="h-44 w-full object-cover" loading="lazy" />
+          <div className="absolute top-3 left-3 flex gap-2">
+            {p.prime && <Badge className="rounded-full">Prime</Badge>}
+            {p.stock <= 10 && (
+              <Badge variant="destructive" className="rounded-full">
+                Low stock
+              </Badge>
+            )}
+          </div>
         </div>
-      </div>
-      <CardContent className="p-4">
-        <div className="text-sm font-semibold line-clamp-2">{p.title}</div>
-        <div className="mt-2 flex items-center justify-between">
-          <div className="text-lg font-black">{formatMoneyAED(p.price)}</div>
-          <div className="text-xs text-black/50">{p.category}</div>
-        </div>
-        <div className="mt-2 flex items-center gap-2">
-          <Stars value={p.rating} />
-          <span className="text-xs text-black/50">
-            {p.rating.toFixed(1)} ({p.reviews.toLocaleString()})
-          </span>
-        </div>
-        <div className="mt-4 flex gap-2">
-          <Button className="flex-1" onClick={() => onAdd(p)}>Add to cart</Button>
-          <Button variant="ghost" onClick={() => onQuickView(p)}>View</Button>
-        </div>
-      </CardContent>
-    </Card>
+        <CardContent className="p-4">
+          <div className="text-sm font-semibold line-clamp-2">{p.title}</div>
+          <div className="mt-2 flex items-center justify-between">
+            <div className="text-lg font-black">{formatMoneyAED(p.price)}</div>
+            <div className="text-xs text-muted-foreground">{p.category}</div>
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <Stars value={p.rating} />
+            <span className="text-xs text-muted-foreground">
+              {p.rating.toFixed(1)} ({p.reviews.toLocaleString()})
+            </span>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <Button className="rounded-2xl" onClick={() => onAdd(p)}>
+              Add to cart
+            </Button>
+            <Button variant="secondary" className="rounded-2xl" onClick={() => onQuickView(p)}>
+              View
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
 
-function TopNav({
-  query,
-  setQuery,
-  category,
-  setCategory,
-  cartCount,
-  onOpenCart,
-  page,
-  setPage,
-  session,
-  onOpenAuth,
-  onLogout,
-}: {
-  query: string;
-  setQuery: (v: string) => void;
-  category: string;
-  setCategory: (v: string) => void;
-  cartCount: number;
-  onOpenCart: () => void;
-  page: "home" | "orders" | "admin";
-  setPage: (v: "home" | "orders" | "admin") => void;
-  session: any;
-  onOpenAuth: () => void;
-  onLogout: () => void;
-}) {
-  return (
-    <div className="sticky top-0 z-40">
-      <div className="bg-gradient-to-r from-red-700 via-red-600 to-orange-500 text-white">
-        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-3">
-          <button onClick={() => setPage("home")} className="flex items-center gap-2">
-            <DragonMartLogo />
-            <div className="leading-tight text-left">
-              <div className="font-black tracking-tight">Dragon Mart Online</div>
-              <div className="text-xs text-white/70">Deliver to UAE</div>
-            </div>
-          </button>
-
-          <div className="hidden md:flex items-center gap-2">
-            <div className="text-xs text-white/80">Category:</div>
-            <div className="relative">
-              <select
-                value={category}
-                onChange={(e) => {
-                  setCategory(e.target.value);
-                  setPage("home");
-                }}
-                className="h-10 rounded-2xl bg-white/15 px-3 text-sm font-semibold outline-none appearance-none pr-10"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c} className="text-black">
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 opacity-80" />
-            </div>
-          </div>
-
-          <div className="flex-1 relative">
-            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-80" />
-            <Input
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setPage("home");
-              }}
-              placeholder="Search products, brands and more"
-              className="pl-9 rounded-2xl bg-white text-black"
-            />
-          </div>
-
-          <Button onClick={onOpenCart} variant="secondary" className="relative rounded-2xl bg-white/15 hover:bg-white/20 text-white">
-            <ShoppingCart className="h-4 w-4" />
-            <span className="hidden sm:inline">Cart</span>
-            {cartCount > 0 && (
-              <span className="absolute -top-2 -right-2 h-5 min-w-5 px-1 rounded-full bg-white text-zinc-900 text-xs grid place-items-center font-bold">
-                {cartCount}
-              </span>
-            )}
-          </Button>
-
-          {!session ? (
-            <Button onClick={onOpenAuth} variant="secondary" className="rounded-2xl bg-white/15 hover:bg-white/20 text-white">
-              <User className="h-4 w-4" />
-              <span className="hidden sm:inline">Login</span>
-            </Button>
-          ) : (
-            <div className="hidden sm:flex items-center gap-2">
-              <Button
-                variant="secondary"
-                className={cn("rounded-2xl bg-white/15 hover:bg-white/20 text-white", page === "orders" && "bg-white/20")}
-                onClick={() => setPage("orders")}
-              >
-                <Package className="h-4 w-4" /> Orders
-              </Button>
-              {session.role === "admin" && (
-                <Button
-                  variant="secondary"
-                  className={cn("rounded-2xl bg-white/15 hover:bg-white/20 text-white", page === "admin" && "bg-white/20")}
-                  onClick={() => setPage("admin")}
-                >
-                  <Settings className="h-4 w-4" /> Admin
-                </Button>
-              )}
-              <Button variant="secondary" className="rounded-2xl bg-white/15 hover:bg-white/20 text-white" onClick={onLogout}>
-                <LogOut className="h-4 w-4" /> Logout
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="bg-red-800 text-white/90 border-b border-red-700">
-        <div className="mx-auto max-w-6xl px-4 py-2 flex items-center gap-2 overflow-x-auto">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c}
-              onClick={() => {
-                setCategory(c);
-                setPage("home");
-              }}
-              className={cn(
-                "whitespace-nowrap text-sm px-3 py-1 rounded-2xl transition",
-                c === category ? "bg-white/15 text-white" : "hover:bg-white/10"
-              )}
-            >
-              {c}
-            </button>
-          ))}
-          <div className="ml-auto hidden md:flex items-center gap-4 text-xs">
-            <div className="flex items-center gap-1"><Truck className="h-4 w-4" /> Fast delivery</div>
-            <div className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Secure payments</div>
-            <div className="flex items-center gap-1"><RotateCcw className="h-4 w-4" /> Easy returns</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+function sortLabel(sort: string) {
+  if (sort === "price_asc") return "Low → High";
+  if (sort === "price_desc") return "High → Low";
+  if (sort === "rating_desc") return "Rating";
+  return "Featured";
 }
 
 function FiltersBar({
@@ -571,8 +539,8 @@ function FiltersBar({
   priceMax,
   setPriceMax,
 }: {
-  sort: "featured" | "price_asc" | "price_desc" | "rating_desc";
-  setSort: (v: "featured" | "price_asc" | "price_desc" | "rating_desc") => void;
+  sort: string;
+  setSort: (v: string) => void;
   onlyPrime: boolean;
   setOnlyPrime: React.Dispatch<React.SetStateAction<boolean>>;
   priceMax: number;
@@ -587,36 +555,33 @@ function FiltersBar({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setOnlyPrime((v) => !v)}
-            className={cn(
-              "h-10 px-4 rounded-2xl text-sm font-semibold border transition",
-              onlyPrime ? "bg-orange-600 text-white border-orange-600" : "bg-white border-black/10 hover:bg-black/5"
-            )}
-          >
+          <Button variant={onlyPrime ? "default" : "secondary"} className="rounded-2xl" onClick={() => setOnlyPrime((v) => !v)}>
             Prime
-          </button>
+          </Button>
 
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as any)}
-            className="h-10 rounded-2xl border border-black/10 bg-white px-3 text-sm font-semibold outline-none"
-          >
-            <option value="featured">Featured</option>
-            <option value="price_asc">Price: Low to High</option>
-            <option value="price_desc">Price: High to Low</option>
-            <option value="rating_desc">Rating</option>
-          </select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary" className="rounded-2xl">
+                Sort: {sortLabel(sort)} <ChevronDown className="h-4 w-4 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {[
+                { id: "featured", label: "Featured" },
+                { id: "price_asc", label: "Price: Low to High" },
+                { id: "price_desc", label: "Price: High to Low" },
+                { id: "rating_desc", label: "Rating" },
+              ].map((o) => (
+                <DropdownMenuItem key={o.id} onClick={() => setSort(o.id)} className={o.id === sort ? "font-semibold" : ""}>
+                  {o.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-          <div className="flex items-center gap-2 rounded-2xl bg-white border border-black/10 px-3 py-2">
+          <div className="flex items-center gap-2 rounded-2xl bg-muted px-3 py-2">
             <span className="text-sm font-semibold">Max:</span>
-            <input
-              type="range"
-              min={20}
-              max={1500}
-              value={priceMax}
-              onChange={(e) => setPriceMax(Number(e.target.value))}
-            />
+            <input type="range" min={20} max={1500} value={priceMax} onChange={(e) => setPriceMax(Number(e.target.value))} />
             <span className="text-sm font-black">{formatMoneyAED(priceMax)}</span>
           </div>
         </div>
@@ -625,54 +590,109 @@ function FiltersBar({
   );
 }
 
-function OrdersPage({ orders }: { orders: Order[] }) {
+function CartSheet({
+  open,
+  setOpen,
+  items,
+  onInc,
+  onDec,
+  onRemove,
+  total,
+  onCheckout,
+}: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  items: { product: Product; qty: number }[];
+  onInc: (id: string) => void;
+  onDec: (id: string) => void;
+  onRemove: (id: string) => void;
+  total: number;
+  onCheckout: () => void;
+}) {
   return (
-    <div className="mx-auto max-w-6xl px-4 pt-6 pb-12">
-      <div className="text-2xl font-black">Orders</div>
-      <div className="mt-5 grid gap-4">
-        {orders.length === 0 ? (
-          <Card>
-            <CardContent className="p-5 text-sm text-black/60">
-              No orders yet. Complete a checkout to see your order history.
-            </CardContent>
-          </Card>
-        ) : (
-          orders.map((o) => (
-            <Card key={o.id}>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Order #{o.id}</span>
-                  <Badge variant="secondary">{o.status}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-5 pt-0">
-                <div className="text-sm text-black/60">Placed: {new Date(o.createdAt).toLocaleString()}</div>
-                <div className="mt-2 font-black text-lg">{formatMoneyAED(o.total)}</div>
-                <div className="mt-3 grid gap-2">
-                  {o.items.map((it) => (
-                    <div key={it.productId} className="flex items-center justify-between text-sm">
-                      <div className="line-clamp-1">{it.title}</div>
-                      <div className="text-black/50">x{it.qty}</div>
-                    </div>
-                  ))}
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetContent className="w-full sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle className="flex items-center justify-between">
+            <span>Your Cart</span>
+            <Button variant="ghost" size="icon" className="rounded-2xl" onClick={() => setOpen(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </SheetTitle>
+        </SheetHeader>
+
+        <div className="mt-6 space-y-3">
+          {items.length === 0 ? (
+            <div className="rounded-2xl border p-4 text-sm text-muted-foreground">Your cart is empty. Add a few items to see them here.</div>
+          ) : (
+            items.map(({ product, qty }) => (
+              <div key={product.id} className="flex gap-3 rounded-2xl border p-3">
+                <img src={product.img} alt={product.title} className="h-16 w-16 rounded-2xl object-cover" />
+                <div className="flex-1">
+                  <div className="text-sm font-semibold line-clamp-2">{product.title}</div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <div className="text-sm font-black">{formatMoneyAED(product.price)}</div>
+                    <Button variant="ghost" className="h-8 rounded-2xl" onClick={() => onRemove(product.id)}>
+                      Remove
+                    </Button>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Button variant="secondary" size="icon" className="rounded-2xl" onClick={() => onDec(product.id)}>
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <div className="min-w-10 text-center font-semibold">{qty}</div>
+                    <Button variant="secondary" size="icon" className="rounded-2xl" onClick={() => onInc(product.id)}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-    </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="mt-6 rounded-2xl border p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">Subtotal</div>
+            <div className="text-lg font-black">{formatMoneyAED(total)}</div>
+          </div>
+          <div className="mt-3">
+            <Button className="w-full rounded-2xl" disabled={items.length === 0} onClick={onCheckout}>
+              Checkout (Stripe)
+            </Button>
+            <div className="mt-2 text-xs text-muted-foreground">Demo mode—connect Stripe backend to charge.</div>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
-function ProductQuickModal({
+function toYouTubeEmbed(url: string) {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("youtu.be")) {
+      const id = u.pathname.replace("/", "");
+      return id ? `https://www.youtube.com/embed/${id}` : null;
+    }
+    if (u.hostname.includes("youtube.com")) {
+      const id = u.searchParams.get("v");
+      return id ? `https://www.youtube.com/embed/${id}` : null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function ProductDialog({
   open,
-  onClose,
+  setOpen,
   product,
   onAdd,
 }: {
   open: boolean;
-  onClose: () => void;
+  setOpen: (v: boolean) => void;
   product: Product | null;
   onAdd: (p: Product) => void;
 }) {
@@ -687,153 +707,281 @@ function ProductQuickModal({
   if (!product) return null;
 
   return (
-    <Modal open={open} onClose={onClose} title={product.title} widthClass="max-w-3xl">
-      <div className="grid md:grid-cols-2 gap-5">
-        <div>
-          <div className="rounded-3xl overflow-hidden border border-black/10">
-            <img
-              src={gallery[Math.min(activeIdx, Math.max(gallery.length - 1, 0))]}
-              alt={product.title}
-              className="h-72 w-full object-cover"
-            />
-          </div>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-3xl rounded-3xl">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-black">{product.title}</DialogTitle>
+        </DialogHeader>
 
-          {gallery.length > 1 && (
-            <div className="mt-3 grid grid-cols-5 gap-2">
-              {gallery.slice(0, 10).map((u, i) => (
-                <button
-                  key={`${u}_${i}`}
-                  onClick={() => setActiveIdx(i)}
-                  className={cn("rounded-2xl overflow-hidden border", i === activeIdx && "ring-2 ring-orange-400")}
-                  title={`Image ${i + 1}`}
-                >
-                  <img src={u} alt={`thumb ${i + 1}`} className="h-14 w-full object-cover" />
-                </button>
-              ))}
+        <div className="grid md:grid-cols-2 gap-5">
+          <div>
+            <div className="rounded-3xl overflow-hidden border">
+              <img
+                src={gallery[Math.min(activeIdx, Math.max(gallery.length - 1, 0))]}
+                alt={product.title}
+                className="h-72 w-full object-cover"
+              />
             </div>
-          )}
 
-          {videos.length > 0 && (
-            <div className="mt-4 space-y-3">
-              <div className="text-sm font-semibold flex items-center gap-2">
-                <Play className="h-4 w-4" /> Product videos
+            {gallery.length > 1 && (
+              <div className="mt-3 grid grid-cols-5 gap-2">
+                {gallery.slice(0, 10).map((u, i) => (
+                  <button
+                    key={`${u}_${i}`}
+                    onClick={() => setActiveIdx(i)}
+                    className={`rounded-2xl overflow-hidden border ${i === activeIdx ? "ring-2 ring-orange-400" : ""}`}
+                    title={`Image ${i + 1}`}
+                  >
+                    <img src={u} alt={`thumb ${i + 1}`} className="h-14 w-full object-cover" />
+                  </button>
+                ))}
               </div>
-              {videos.map((v, idx) => {
-                const embed = toYouTubeEmbed(v);
-                if (embed) {
+            )}
+
+            {videos.length > 0 && (
+              <div className="mt-4 space-y-3">
+                <div className="text-sm font-semibold">Product videos</div>
+                {videos.map((v, idx) => {
+                  const embed = toYouTubeEmbed(v);
+                  if (embed) {
+                    return (
+                      <iframe
+                        key={`${v}_${idx}`}
+                        className="w-full aspect-video rounded-2xl border"
+                        src={embed}
+                        allow="autoplay; encrypted-media"
+                        allowFullScreen
+                        title={`video_${idx}`}
+                      />
+                    );
+                  }
                   return (
-                    <iframe
-                      key={`${v}_${idx}`}
-                      className="w-full aspect-video rounded-2xl border"
-                      src={embed}
-                      allow="autoplay; encrypted-media"
-                      allowFullScreen
-                      title={`video_${idx}`}
-                    />
+                    <video key={`${v}_${idx}`} className="w-full rounded-2xl border" controls>
+                      <source src={v} />
+                    </video>
                   );
-                }
-                return (
-                  <video key={`${v}_${idx}`} className="w-full rounded-2xl border" controls>
-                    <source src={v} />
-                  </video>
-                );
-              })}
+                })}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2">
+              <Stars value={product.rating} />
+              <span className="text-sm text-muted-foreground">
+                {product.rating.toFixed(1)} • {product.reviews.toLocaleString()} reviews
+              </span>
             </div>
-          )}
-        </div>
 
-        <div>
-          <div className="flex items-center gap-2">
-            <Stars value={product.rating} />
-            <span className="text-sm text-black/60">
-              {product.rating.toFixed(1)} • {product.reviews.toLocaleString()} reviews
-            </span>
-          </div>
+            <div className="mt-3 text-2xl font-black">{formatMoneyAED(product.price)}</div>
 
-          <div className="mt-3 text-2xl font-black">{formatMoneyAED(product.price)}</div>
+            <div className="mt-3 flex gap-2 flex-wrap">
+              {product.prime && <Badge className="rounded-full">Prime</Badge>}
+              <Badge variant="secondary" className="rounded-full">
+                {product.category}
+              </Badge>
+              <Badge variant={product.stock > 10 ? "secondary" : "destructive"} className="rounded-full">
+                {product.stock > 10 ? "In stock" : "Limited"}
+              </Badge>
+            </div>
 
-          <div className="mt-3 flex gap-2 flex-wrap">
-            {product.prime && <Badge>Prime</Badge>}
-            <Badge variant="secondary">{product.category}</Badge>
-            <Badge variant={product.stock > 10 ? "secondary" : "destructive"}>
-              {product.stock > 10 ? "In stock" : "Limited"}
-            </Badge>
-          </div>
+            <p className="mt-4 text-sm text-muted-foreground leading-relaxed">{product.desc}</p>
 
-          <p className="mt-4 text-sm text-black/60 leading-relaxed">{product.desc}</p>
-
-          <div className="mt-5 grid gap-2">
-            <Button onClick={() => onAdd(product)}>Add to cart</Button>
-            <Button variant="ghost">Buy now</Button>
-            <div className="mt-2 text-xs text-black/50">Delivery estimate: 2–4 days (demo)</div>
+            <div className="mt-5 grid gap-2">
+              <Button className="rounded-2xl" onClick={() => onAdd(product)}>
+                Add to cart
+              </Button>
+              <Button variant="secondary" className="rounded-2xl">
+                Buy now
+              </Button>
+              <div className="mt-2 text-xs text-muted-foreground">Delivery estimate: 2–4 days (demo)</div>
+            </div>
           </div>
         </div>
-      </div>
-    </Modal>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-function AuthModal({
+function AuthDialog({
   open,
-  onClose,
-  onLogin,
+  setOpen,
+  setSession,
 }: {
   open: boolean;
-  onClose: () => void;
-  onLogin: (sess: any) => void;
+  setOpen: (v: boolean) => void;
+  setSession: (s: any) => void;
 }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [name, setName] = useState("Hanif");
   const [email, setEmail] = useState("hanif@example.com");
   const [password, setPassword] = useState("password");
-  const [asAdmin, setAsAdmin] = useState(false);
+  const [msg, setMsg] = useState<string>("");
+
+  function normalizeEmail(e: string) {
+    return (e || "").trim().toLowerCase();
+  }
+
+  function login() {
+    setMsg("");
+    const e = normalizeEmail(email);
+
+    // Owner admin
+    if (e === OWNER_ADMIN_EMAIL.toLowerCase() && password === OWNER_ADMIN_PASSWORD) {
+      setSession({ id: "owner_admin", name: name || "Owner", email: e, role: "owner" });
+      setOpen(false);
+      return;
+    }
+
+    const users = getUsers();
+    const u = users[e];
+    if (!u || u.password !== password) {
+      setMsg("ইমেইল বা পাসওয়ার্ড ভুল।");
+      return;
+    }
+
+    const approved = getApprovedAdmins().includes(e);
+    setSession({ id: `user_${e}`, name: u.name || "User", email: e, role: approved ? "admin" : "customer" });
+    setOpen(false);
+  }
+
+  function signup() {
+    setMsg("");
+    const e = normalizeEmail(email);
+    if (!e || !password) {
+      setMsg("ইমেইল এবং পাসওয়ার্ড দিন।");
+      return;
+    }
+
+    if (e === OWNER_ADMIN_EMAIL.toLowerCase()) {
+      setMsg("এই ইমেইল Owner Admin-এর জন্য reserved.");
+      return;
+    }
+
+    const users = getUsers();
+    if (users[e]) {
+      setMsg("এই ইমেইল আগে থেকেই আছে। Login করুন।");
+      return;
+    }
+
+    saveUser({ name: name || "User", email: e, password });
+    setMsg("Account তৈরি হয়েছে। এখন Login করুন।");
+    setMode("login");
+  }
+
+  function requestAdmin() {
+    setMsg("");
+    const e = normalizeEmail(email);
+    if (!e) {
+      setMsg("আগে ইমেইল লিখুন।");
+      return;
+    }
+    addAdminRequest({ email: e, name: name || "User", createdAt: new Date().toISOString() });
+    setMsg(`Admin access request পাঠানো হয়েছে: ${OWNER_ADMIN_EMAIL}`);
+  }
 
   function submit() {
-    onLogin({ id: "demo_user", name: name || "User", email, role: asAdmin ? "admin" : "customer" });
-    onClose();
+    if (mode === "login") login();
+    else signup();
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={mode === "login" ? "Login" : "Create account"}>
-      <div className="space-y-3">
-        {mode === "signup" && (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-md rounded-3xl">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-black">{mode === "login" ? "Login" : "Create account"}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          {mode === "signup" && (
+            <div>
+              <div className="text-sm font-semibold">Full name</div>
+              <Input className="rounded-2xl" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+          )}
+
+          {mode === "login" && (
+            <div>
+              <div className="text-sm font-semibold">Name (optional)</div>
+              <Input className="rounded-2xl" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+          )}
+
           <div>
-            <div className="text-sm font-semibold">Full name</div>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
+            <div className="text-sm font-semibold">Email</div>
+            <Input className="rounded-2xl" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
+
+          <div>
+            <div className="text-sm font-semibold">Password</div>
+            <Input type="password" className="rounded-2xl" value={password} onChange={(e) => setPassword(e.target.value)} />
+          </div>
+
+          {msg && <div className="text-sm text-red-600">{msg}</div>}
+
+          <Button className="w-full rounded-2xl" onClick={submit}>
+            {mode === "login" ? "Login" : "Sign up"}
+          </Button>
+
+          {mode === "login" && (
+            <Button variant="secondary" className="w-full rounded-2xl" onClick={requestAdmin}>
+              Request Admin Access (Owner approval)
+            </Button>
+          )}
+
+          <div className="text-xs text-muted-foreground">
+            Demo only: Password localStorage-এ save হয়। Real project-এ backend + hashing লাগবে।
+          </div>
+
+          <div className="flex justify-between text-sm">
+            <button className="underline" onClick={() => setMode(mode === "login" ? "signup" : "login")}>
+              {mode === "login" ? "Create an account" : "I already have an account"}
+            </button>
+            <button className="underline" onClick={() => setOpen(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function OrdersPage({ orders }: { orders: Order[] }) {
+  return (
+    <div className="mx-auto max-w-6xl px-4 pt-6 pb-12">
+      <div className="text-2xl font-black">Orders</div>
+      <div className="mt-5 grid gap-4">
+        {orders.length === 0 ? (
+          <Card className="rounded-3xl">
+            <CardContent className="p-5 text-sm text-muted-foreground">No orders yet. Complete a checkout to see your order history.</CardContent>
+          </Card>
+        ) : (
+          orders.map((o) => (
+            <Card key={o.id} className="rounded-3xl">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Order #{o.id}</span>
+                  <Badge className="rounded-full">{o.status}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-5 pt-0">
+                <div className="text-sm text-muted-foreground">Placed: {new Date(o.createdAt).toLocaleString()}</div>
+                <div className="mt-2 font-black text-lg">{formatMoneyAED(o.total)}</div>
+                <div className="mt-3 grid gap-2">
+                  {o.items.map((it) => (
+                    <div key={it.productId} className="flex items-center justify-between text-sm">
+                      <div className="line-clamp-1">{it.title}</div>
+                      <div className="text-muted-foreground">x{it.qty}</div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))
         )}
-
-        <div>
-          <div className="text-sm font-semibold">Email</div>
-          <Input value={email} onChange={(e) => setEmail(e.target.value)} />
-        </div>
-
-        <div>
-          <div className="text-sm font-semibold">Password</div>
-          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        </div>
-
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={asAdmin} onChange={(e) => setAsAdmin(e.target.checked)} />
-          Login as admin (demo)
-        </label>
-
-        <Button className="w-full" onClick={submit}>
-          {mode === "login" ? "Login" : "Sign up"}
-        </Button>
-
-        <div className="text-xs text-black/50">Demo only. No real password. Tick admin to access Admin page.</div>
-
-        <div className="flex justify-between text-sm">
-          <button className="underline" onClick={() => setMode(mode === "login" ? "signup" : "login")}>
-            {mode === "login" ? "Create an account" : "I already have an account"}
-          </button>
-          <button className="underline" onClick={onClose}>
-            Cancel
-          </button>
-        </div>
       </div>
-    </Modal>
+    </div>
   );
 }
 
@@ -841,10 +989,12 @@ function AdminPage({
   products,
   onCreateProduct,
   onDeleteProduct,
+  session,
 }: {
   products: Product[];
   onCreateProduct: (p: Product) => void;
   onDeleteProduct: (id: string) => void;
+  session: any;
 }) {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Electronics");
@@ -855,9 +1005,26 @@ function AdminPage({
   const [imgUrl, setImgUrl] = useState(
     "https://images.unsplash.com/photo-1518441902117-f0a9e9f8d1d4?auto=format&fit=crop&w=1200&q=60"
   );
+
   const [extraImages, setExtraImages] = useState<string[]>([]);
   const [videos, setVideos] = useState<string[]>([]);
   const [desc, setDesc] = useState("New product description...");
+
+  const [requests, setRequests] = useState<AdminRequest[]>([]);
+  const [approved, setApproved] = useState<string[]>([]);
+
+  const isOwner =
+    (session?.email || "").toLowerCase() === OWNER_ADMIN_EMAIL.toLowerCase() && session?.role === "owner";
+
+  useEffect(() => {
+    setRequests(getAdminRequests());
+    setApproved(getApprovedAdmins());
+  }, []);
+
+  function refreshApprovals() {
+    setRequests(getAdminRequests());
+    setApproved(getApprovedAdmins());
+  }
 
   function addImageField() {
     setExtraImages((xs) => [...xs, ""]);
@@ -867,6 +1034,12 @@ function AdminPage({
   }
   function removeImageField(i: number) {
     setExtraImages((xs) => xs.filter((_, idx) => idx !== i));
+  }
+
+  function setAsMainImage(url: string) {
+    const u = (url || "").trim();
+    if (!u) return;
+    setImgUrl(u);
   }
 
   function addVideoField() {
@@ -905,50 +1078,126 @@ function AdminPage({
     setVideos([]);
   }
 
+  function approve(email: string) {
+    approveAdmin(email);
+    removeAdminRequest(email);
+    refreshApprovals();
+  }
+
+  function reject(email: string) {
+    removeAdminRequest(email);
+    refreshApprovals();
+  }
+
+  function revoke(email: string) {
+    removeApprovedAdmin(email);
+    refreshApprovals();
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-4 pt-6 pb-12">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <div className="text-sm text-black/50">Admin</div>
+          <div className="text-sm text-muted-foreground">Admin</div>
           <div className="text-2xl font-black">Product Upload</div>
         </div>
-        <Badge variant="secondary">Demo admin</Badge>
+        <Badge variant="secondary" className="rounded-full">
+          {isOwner ? "Owner admin" : "Admin"}
+        </Badge>
       </div>
 
+      {isOwner && (
+        <div className="mt-5 grid lg:grid-cols-2 gap-4">
+          <Card className="rounded-3xl">
+            <CardHeader>
+              <CardTitle>Admin Requests (Owner approval)</CardTitle>
+            </CardHeader>
+            <CardContent className="p-5 pt-0 space-y-3">
+              {requests.length === 0 ? (
+                <div className="text-sm text-muted-foreground">কোন pending request নেই।</div>
+              ) : (
+                requests.map((r) => (
+                  <div key={r.email} className="flex items-center justify-between gap-3 rounded-2xl border p-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold line-clamp-1">{r.name}</div>
+                      <div className="text-xs text-muted-foreground line-clamp-1">{r.email}</div>
+                      <div className="text-[11px] text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button className="rounded-2xl" onClick={() => approve(r.email)}>
+                        Approve
+                      </Button>
+                      <Button variant="secondary" className="rounded-2xl" onClick={() => reject(r.email)}>
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-3xl">
+            <CardHeader>
+              <CardTitle>Approved Admins</CardTitle>
+            </CardHeader>
+            <CardContent className="p-5 pt-0 space-y-2">
+              {approved.length === 0 ? (
+                <div className="text-sm text-muted-foreground">এখনও কোন extra admin approve করা হয়নি।</div>
+              ) : (
+                approved.map((e) => (
+                  <div key={e} className="flex items-center justify-between gap-3 rounded-2xl border p-3">
+                    <div className="text-sm font-semibold">{e}</div>
+                    <Button variant="secondary" className="rounded-2xl" onClick={() => revoke(e)}>
+                      Remove
+                    </Button>
+                  </div>
+                ))
+              )}
+              <div className="text-xs text-muted-foreground">Note: এটি demo (localStorage). Real approval system-এর জন্য backend লাগবে।</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <div className="mt-5 grid lg:grid-cols-2 gap-4">
-        <Card>
+        <Card className="rounded-3xl">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Upload className="h-5 w-5" /> Add new product</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" /> Add new product
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-5 pt-0 space-y-3">
             <div>
               <div className="text-sm font-semibold">Title</div>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+              <Input className="rounded-2xl" value={title} onChange={(e) => setTitle(e.target.value)} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <div className="text-sm font-semibold">Category</div>
                 <select
-                  className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-2xl border bg-background px-3 py-2 text-sm"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                 >
                   {CATEGORIES.filter((c) => c !== "All").map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
                   ))}
                 </select>
               </div>
               <div>
                 <div className="text-sm font-semibold">Price (AED)</div>
-                <Input type="number" value={price as any} onChange={(e) => setPrice(Number(e.target.value))} />
+                <Input type="number" className="rounded-2xl" value={price as any} onChange={(e) => setPrice(Number(e.target.value))} />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <div className="text-sm font-semibold">Stock</div>
-                <Input type="number" value={stock as any} onChange={(e) => setStock(Number(e.target.value))} />
+                <Input type="number" className="rounded-2xl" value={stock as any} onChange={(e) => setStock(Number(e.target.value))} />
               </div>
               <label className="flex items-center gap-2 text-sm pt-7">
                 <input type="checkbox" checked={prime} onChange={(e) => setPrime(e.target.checked)} />
@@ -958,22 +1207,42 @@ function AdminPage({
 
             <div>
               <div className="text-sm font-semibold">Main Image URL</div>
-              <Input value={imgUrl} onChange={(e) => setImgUrl(e.target.value)} />
+              <div className="flex gap-2">
+                <Input className="rounded-2xl" value={imgUrl} onChange={(e) => setImgUrl(e.target.value)} />
+                <Button variant="secondary" className="rounded-2xl" type="button" onClick={() => setAsMainImage(imgUrl)}>
+                  Set
+                </Button>
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground">
+                Tip: নিচের extra images থেকে “Set as main” চাপলে main image হয়ে যাবে।
+              </div>
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold">More Pictures (multiple)</div>
-                <Button type="button" variant="ghost" onClick={addImageField}>+ Add</Button>
+                <Button type="button" variant="secondary" className="rounded-2xl" onClick={addImageField}>
+                  + Add Picture
+                </Button>
               </div>
               {extraImages.length === 0 ? (
-                <div className="text-xs text-black/50">No extra pictures yet.</div>
+                <div className="text-xs text-muted-foreground">No extra pictures yet.</div>
               ) : (
                 <div className="space-y-2">
                   {extraImages.map((val, i) => (
                     <div key={`img_${i}`} className="flex gap-2">
-                      <Input placeholder="https://...jpg" value={val} onChange={(e) => updateImageField(i, e.target.value)} />
-                      <Button type="button" variant="ghost" onClick={() => removeImageField(i)}>Remove</Button>
+                      <Input
+                        placeholder="https://...jpg"
+                        value={val}
+                        onChange={(e) => updateImageField(i, e.target.value)}
+                        className="rounded-2xl"
+                      />
+                      <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => setAsMainImage(val)}>
+                        Set as main
+                      </Button>
+                      <Button type="button" variant="ghost" className="rounded-2xl" onClick={() => removeImageField(i)}>
+                        Remove
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -983,10 +1252,12 @@ function AdminPage({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold">Videos (YouTube or .mp4)</div>
-                <Button type="button" variant="ghost" onClick={addVideoField}>+ Add</Button>
+                <Button type="button" variant="secondary" className="rounded-2xl" onClick={addVideoField}>
+                  + Add Video
+                </Button>
               </div>
               {videos.length === 0 ? (
-                <div className="text-xs text-black/50">No videos yet.</div>
+                <div className="text-xs text-muted-foreground">No videos yet.</div>
               ) : (
                 <div className="space-y-2">
                   {videos.map((val, i) => (
@@ -995,8 +1266,11 @@ function AdminPage({
                         placeholder="https://youtube.com/watch?v=... or https://...mp4"
                         value={val}
                         onChange={(e) => updateVideoField(i, e.target.value)}
+                        className="rounded-2xl"
                       />
-                      <Button type="button" variant="ghost" onClick={() => removeVideoField(i)}>Remove</Button>
+                      <Button type="button" variant="ghost" className="rounded-2xl" onClick={() => removeVideoField(i)}>
+                        Remove
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -1006,36 +1280,42 @@ function AdminPage({
             <div>
               <div className="text-sm font-semibold">Description</div>
               <textarea
-                className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm min-h-24 outline-none focus:ring-2 focus:ring-orange-400"
+                className="mt-1 w-full rounded-2xl border bg-background px-3 py-2 text-sm min-h-24"
                 value={desc}
                 onChange={(e) => setDesc(e.target.value)}
               />
             </div>
 
-            <Button className="rounded-2xl" onClick={submit}>Create product</Button>
-            <div className="text-xs text-black/50">Demo only. Real version: upload images to storage + save to DB.</div>
+            <Button className="rounded-2xl" onClick={submit}>
+              Create product
+            </Button>
+            <div className="text-xs text-muted-foreground">Demo only. Real version: upload to storage + save to DB.</div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader><CardTitle>Catalog preview</CardTitle></CardHeader>
+        <Card className="rounded-3xl">
+          <CardHeader>
+            <CardTitle>Catalog preview</CardTitle>
+          </CardHeader>
           <CardContent className="p-5 pt-0">
-            <div className="text-sm text-black/50">Total products: {products.length}</div>
+            <div className="text-sm text-muted-foreground">Total products: {products.length}</div>
             <div className="mt-3 grid gap-3">
-              {products.slice(0, 10).map((p) => (
-                <div key={p.id} className="flex items-center gap-3 rounded-2xl border border-black/10 p-3">
+              {products.slice(0, 8).map((p) => (
+                <div key={p.id} className="flex items-center gap-3 rounded-2xl border p-3">
                   <button onClick={() => onDeleteProduct(p.id)} className="text-red-600 text-xs font-semibold mr-1">
                     Delete
                   </button>
                   <img src={p.img} alt={p.title} className="h-12 w-12 rounded-2xl object-cover" />
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1">
                     <div className="text-sm font-semibold line-clamp-1">{p.title}</div>
-                    <div className="text-xs text-black/50">{p.category} • {formatMoneyAED(p.price)}</div>
-                    <div className="text-[11px] text-black/40">
+                    <div className="text-xs text-muted-foreground">
+                      {p.category} • {formatMoneyAED(p.price)}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
                       {(p.images?.length || 0)} photos • {(p.videos?.length || 0)} videos
                     </div>
                   </div>
-                  {p.prime && <Badge>Prime</Badge>}
+                  {p.prime && <Badge className="rounded-full">Prime</Badge>}
                 </div>
               ))}
             </div>
@@ -1046,8 +1326,7 @@ function AdminPage({
   );
 }
 
-/* ------------------ MAIN PAGE ------------------ */
-export default function Page() {
+export default function DragonMartOnline() {
   const { session, setSession } = useSession();
 
   const [page, setPage] = useState<"home" | "orders" | "admin">("home");
@@ -1091,13 +1370,19 @@ export default function Page() {
   const [authOpen, setAuthOpen] = useState(false);
 
   useEffect(() => {
-    try { localStorage.setItem("dmo_cart", JSON.stringify(cart)); } catch {}
+    try {
+      localStorage.setItem("dmo_cart", JSON.stringify(cart));
+    } catch {}
   }, [cart]);
   useEffect(() => {
-    try { localStorage.setItem("dmo_orders", JSON.stringify(orders)); } catch {}
+    try {
+      localStorage.setItem("dmo_orders", JSON.stringify(orders));
+    } catch {}
   }, [orders]);
   useEffect(() => {
-    try { localStorage.setItem("dmo_products", JSON.stringify(products)); } catch {}
+    try {
+      localStorage.setItem("dmo_products", JSON.stringify(products));
+    } catch {}
   }, [products]);
 
   const cartCount = useMemo(() => Object.values(cart).reduce((a, b) => a + b, 0), [cart]);
@@ -1105,8 +1390,8 @@ export default function Page() {
   const cartItems = useMemo(() => {
     const map = new Map(products.map((p) => [p.id, p] as const));
     return Object.entries(cart)
-      .map(([id, qty]) => ({ product: map.get(id), qty }))
-      .filter((x): x is { product: Product; qty: number } => Boolean(x.product));
+      .map(([id, qty]) => ({ product: map.get(id)!, qty }))
+      .filter((x) => x.product);
   }, [cart, products]);
 
   const subtotal = useMemo(() => cartItems.reduce((sum, { product, qty }) => sum + product.price * qty, 0), [cartItems]);
@@ -1139,9 +1424,11 @@ export default function Page() {
     setCart((c) => ({ ...c, [p.id]: (c[p.id] || 0) + 1 }));
     setCartOpen(true);
   }
+
   function inc(id: string) {
     setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }));
   }
+
   function dec(id: string) {
     setCart((c) => {
       const next = { ...c };
@@ -1151,6 +1438,7 @@ export default function Page() {
       return next;
     });
   }
+
   function remove(id: string) {
     setCart((c) => {
       const next = { ...c };
@@ -1177,7 +1465,7 @@ export default function Page() {
     setProducts((prev) => prev.filter((p) => p.id !== id));
   }
 
-  async function checkoutDemo() {
+  async function checkoutStripeDemo() {
     if (!session) {
       setAuthOpen(true);
       return;
@@ -1203,7 +1491,7 @@ export default function Page() {
     setPage("orders");
   }
 
-  const guardAdmin = session?.role === "admin";
+  const guardAdmin = session?.role === "admin" || session?.role === "owner";
 
   return (
     <div className="min-h-screen bg-orange-50">
@@ -1237,12 +1525,12 @@ export default function Page() {
           <div className="mx-auto max-w-6xl px-4 mt-6 pb-12">
             <div className="flex items-end justify-between gap-3">
               <div>
-                <div className="text-sm text-black/60">Showing</div>
+                <div className="text-sm text-muted-foreground">Showing</div>
                 <div className="text-xl font-black">
                   {filtered.length} result{filtered.length === 1 ? "" : "s"}
                 </div>
               </div>
-              <div className="text-xs text-black/50">Tip: try search “lamp”, “book”, “prime”…</div>
+              <div className="text-xs text-muted-foreground">Tip: try search “lamp”, “book”, “prime”…</div>
             </div>
 
             <motion.div layout className="mt-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1267,111 +1555,62 @@ export default function Page() {
                 { icon: ShieldCheck, title: "Secure checkout", text: "Connect Stripe for real payments." },
                 { icon: RotateCcw, title: "Easy returns", text: "Add return policy pages & order tracking." },
               ].map((b) => (
-                <Card key={b.title}>
+                <Card key={b.title} className="rounded-3xl">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <b.icon className="h-5 w-5" /> {b.title}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="text-sm text-black/60">{b.text}</CardContent>
+                  <CardContent className="text-sm text-muted-foreground">{b.text}</CardContent>
                 </Card>
               ))}
             </div>
 
-            <footer className="mt-12 text-center text-xs text-black/50">
-              Dragon Mart Online — starter template. Plug a backend later to go live.
+            <footer className="mt-12 text-center text-xs text-muted-foreground">
+              Dragon Mart Online — starter template. Plug a backend (Supabase/Firebase/Node) to go live.
             </footer>
           </div>
         </>
       )}
 
-      {page === "orders" && (
-        <OrdersPage orders={orders.filter((o) => !session || o.userEmail === session.email)} />
-      )}
+      {page === "orders" && <OrdersPage orders={orders.filter((o) => !session || o.userEmail === session.email)} />}
 
       {page === "admin" &&
         (guardAdmin ? (
-          <AdminPage products={products} onCreateProduct={createProduct} onDeleteProduct={deleteProduct} />
+          <AdminPage products={products} onCreateProduct={createProduct} onDeleteProduct={deleteProduct} session={session} />
         ) : (
           <div className="mx-auto max-w-6xl px-4 pt-6 pb-12">
-            <Card>
+            <Card className="rounded-3xl">
               <CardContent className="p-6">
                 <div className="text-2xl font-black">Admin access required</div>
-                <div className="mt-2 text-sm text-black/60">Please login as an admin to upload products.</div>
+                <div className="mt-2 text-sm text-muted-foreground">Please login as an admin to upload products.</div>
                 <div className="mt-4 flex gap-2">
-                  <Button onClick={() => setAuthOpen(true)}>Login</Button>
-                  <Button variant="ghost" onClick={() => setPage("home")}>Go home</Button>
+                  <Button className="rounded-2xl" onClick={() => setAuthOpen(true)}>
+                    Login
+                  </Button>
+                  <Button variant="secondary" className="rounded-2xl" onClick={() => setPage("home")}>
+                    Go home
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           </div>
         ))}
 
-      {/* Cart Drawer */}
-      <Drawer open={cartOpen} onClose={() => setCartOpen(false)} title="Your Cart">
-        {cartItems.length === 0 ? (
-          <div className="rounded-2xl border border-black/10 p-4 text-sm text-black/60">
-            Your cart is empty. Add a few items to see them here.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {cartItems.map(({ product, qty }) => (
-              <div key={product.id} className="flex gap-3 rounded-2xl border border-black/10 p-3">
-                <img src={product.img} alt={product.title} className="h-16 w-16 rounded-2xl object-cover" />
-                <div className="flex-1">
-                  <div className="text-sm font-semibold line-clamp-2">{product.title}</div>
-                  <div className="mt-1 flex items-center justify-between">
-                    <div className="text-sm font-black">{formatMoneyAED(product.price)}</div>
-                    <button className="text-xs underline text-black/60" onClick={() => remove(product.id)}>
-                      Remove
-                    </button>
-                  </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <Button size="icon" variant="ghost" onClick={() => dec(product.id)} aria-label="decrease">
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    <div className="min-w-10 text-center font-semibold">{qty}</div>
-                    <Button size="icon" variant="ghost" onClick={() => inc(product.id)} aria-label="increase">
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            <div className="mt-6 rounded-2xl border border-black/10 p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-black/60">Subtotal</div>
-                <div className="text-lg font-black">{formatMoneyAED(subtotal)}</div>
-              </div>
-              <div className="mt-3">
-                <Button className="w-full" onClick={checkoutDemo}>
-                  Checkout (Demo)
-                </Button>
-                <div className="mt-2 text-xs text-black/50">Demo mode—no real payment. Will create order.</div>
-              </div>
-            </div>
-          </div>
-        )}
-      </Drawer>
-
-      {/* Product quick view */}
-      <ProductQuickModal
-        open={quickOpen}
-        onClose={() => setQuickOpen(false)}
-        product={activeProduct}
-        onAdd={addToCart}
+      <CartSheet
+        open={cartOpen}
+        setOpen={setCartOpen}
+        items={cartItems}
+        onInc={inc}
+        onDec={dec}
+        onRemove={remove}
+        total={subtotal}
+        onCheckout={checkoutStripeDemo}
       />
 
-      {/* Auth */}
-      <AuthModal
-        open={authOpen}
-        onClose={() => setAuthOpen(false)}
-        onLogin={(sess) => {
-          setSession(sess);
-          if (sess?.role === "admin") setPage("admin");
-        }}
-      />
+      <ProductDialog open={quickOpen} setOpen={setQuickOpen} product={activeProduct} onAdd={addToCart} />
+
+      <AuthDialog open={authOpen} setOpen={setAuthOpen} setSession={setSession} />
     </div>
   );
 }
