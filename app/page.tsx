@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ShoppingCart,
@@ -19,9 +19,7 @@ import {
   Package,
   Settings,
   Upload,
-  CheckCircle2,
-  Clock3,
-  Trash2,
+  Check,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,13 +36,124 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 
-const MAIN_ADMIN_EMAIL = "hanif9591@gmail.com";
-const MAIN_ADMIN_PASSWORD = "Aliza9591#";
+/**
+ * Dragon Mart Online — Front-end demo (localStorage)
+ * ✅ Admin add product (URL or Browse image)
+ * ✅ Multiple pictures + multiple videos
+ * ✅ Admin approval workflow (Main admin approves other admins)
+ * ✅ Customer ratings + comments
+ * ✅ Cash on Delivery checkout
+ */
 
+// ====== CONFIG (Demo only) ======
+const MAIN_ADMIN_EMAIL = "hanif9591@gmail.com";
+const MAIN_ADMIN_PASSWORD = "Aliza9591#"; // ⚠️ Demo only. For real use, move to ENV + real auth.
+
+// ====== Helpers ======
+function formatMoneyAED(n: number) {
+  return n.toLocaleString(undefined, { style: "currency", currency: "AED" });
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function safeJsonParse<T>(raw: string | null, fallback: T): T {
+  try {
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function uid(prefix = "id") {
+  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
+}
+
+function toYouTubeEmbed(url: string) {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("youtu.be")) {
+      const id = u.pathname.replace("/", "");
+      return id ? `https://www.youtube.com/embed/${id}` : null;
+    }
+    if (u.hostname.includes("youtube.com")) {
+      const id = u.searchParams.get("v");
+      return id ? `https://www.youtube.com/embed/${id}` : null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+// ====== Types ======
+type Role = "customer" | "admin" | "pending_admin";
+
+type Session = {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+};
+
+type ProductReview = {
+  id: string;
+  productId: string;
+  userEmail: string;
+  userName: string;
+  rating: number; // 1-5
+  comment: string;
+  createdAt: string;
+};
+
+type Product = {
+  id: string;
+  title: string;
+  category: string;
+  price: number;
+  rating: number; // average
+  reviews: number; // count
+  prime: boolean;
+  stock: number;
+  img: string; // main
+  images?: string[];
+  videos?: string[];
+  desc: string;
+};
+
+type Order = {
+  id: string;
+  createdAt: string;
+  status: string;
+  paymentMethod: "COD";
+  total: number;
+  items: { productId: string; title: string; qty: number; price: number }[];
+  userEmail: string;
+};
+
+type PendingAdmin = {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+};
+
+// ====== Brand logo ======
 function DragonMartLogo({ className = "h-9 w-9" }: { className?: string }) {
   return (
     <div className={`rounded-2xl bg-white/10 grid place-items-center ${className}`}>
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <path
           d="M6 14c2.8-5.6 7.2-8.4 12-9-1.2 2.6-1.8 4.9-1.8 7.2C16.2 17 12.3 20 8.3 20c-2 0-3.6-0.7-4.3-2.1-.5-1 .2-2.6 2-3.9Z"
           stroke="currentColor"
@@ -58,63 +167,20 @@ function DragonMartLogo({ className = "h-9 w-9" }: { className?: string }) {
   );
 }
 
+// ====== Categories ======
 const CATEGORIES = [
   "All",
   "Electronics",
   "Home",
   "Fashion",
-  "Beauty",
   "Sports",
   "Books",
   "Auto Spare Parts",
   "Toys and Games",
-  "Luggage and Bags", // ✅ added
+  "Luggage and Bags",
 ];
 
-type Product = {
-  id: string;
-  title: string;
-  category: string;
-  price: number;
-  rating: number; // average rating
-  reviews: number; // count of reviews
-  prime: boolean;
-  stock: number;
-  img: string; // main image (url or base64)
-  images?: string[];
-  videos?: string[];
-  desc: string;
-};
-
-type Order = {
-  id: string;
-  createdAt: string;
-  status: string; // COD pending etc
-  total: number;
-  items: { productId: string; title: string; qty: number; price: number }[];
-  userEmail: string;
-  paymentMethod: "COD";
-};
-
-type Review = {
-  id: string;
-  productId: string;
-  userEmail: string;
-  userName: string;
-  rating: number; // 1..5
-  comment: string;
-  createdAt: string;
-};
-
-type Session =
-  | null
-  | {
-      id: string;
-      name: string;
-      email: string;
-      role: "customer" | "admin" | "pending_admin";
-    };
-
+// ====== Demo products ======
 const DEMO_PRODUCTS: Product[] = [
   {
     id: "p1",
@@ -154,78 +220,57 @@ const DEMO_PRODUCTS: Product[] = [
     prime: false,
     stock: 120,
     img: "https://images.unsplash.com/photo-1526401485004-2fda9f6d3d38?auto=format&fit=crop&w=1200&q=60",
-    images: ["https://images.unsplash.com/photo-1526401485004-2fda9e9f8d1d4?auto=format&fit=crop&w=1200&q=60".replace("1526401485004-2fda9e9f8d1d4", "1526401485004-2fda9f6d3d38")],
+    images: ["https://images.unsplash.com/photo-1526401485004-2fda9f6d3d38?auto=format&fit=crop&w=1200&q=60"],
     videos: [],
     desc: "Double-wall insulation keeps drinks cold for up to 24h. Leak-proof cap and durable powder coat.",
   },
 ];
 
-function formatMoneyAED(n: number) {
-  return n.toLocaleString(undefined, { style: "currency", currency: "AED" });
-}
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
+// ====== UI bits ======
 function Stars({ value }: { value: number }) {
   const full = Math.floor(value);
   const half = value - full >= 0.5;
   const stars = Array.from({ length: 5 }, (_, i) => {
     const idx = i + 1;
     const filled = idx <= full || (idx === full + 1 && half);
-    return (
-      <Star key={i} className={`h-4 w-4 ${filled ? "" : "opacity-30"}`} fill={filled ? "currentColor" : "none"} />
-    );
+    return <Star key={i} className={`h-4 w-4 ${filled ? "" : "opacity-30"}`} fill={filled ? "currentColor" : "none"} />;
   });
   return <div className="flex items-center gap-0.5">{stars}</div>;
 }
 
-function safeJsonParse<T>(raw: string | null, fallback: T): T {
-  try {
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
+function useLocalStorageState<T>(key: string, initial: T) {
+  const [state, setState] = useState<T>(() => {
+    if (typeof window === "undefined") return initial;
+    return safeJsonParse<T>(localStorage.getItem(key), initial);
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify(state));
+    } catch {}
+  }, [key, state]);
+
+  return [state, setState] as const;
 }
 
 function useSession() {
-  const [session, setSession] = useState<Session>(() => safeJsonParse<Session>(localStorage.getItem("dmo_session"), null));
-  useEffect(() => {
-    try {
-      localStorage.setItem("dmo_session", JSON.stringify(session));
-    } catch {}
-  }, [session]);
+  const [session, setSession] = useLocalStorageState<Session | null>("dmo_session", null);
   return { session, setSession };
 }
 
-function getApprovedAdmins(): string[] {
-  return safeJsonParse<string[]>(localStorage.getItem("dmo_admins"), [MAIN_ADMIN_EMAIL]);
-}
-function setApprovedAdmins(xs: string[]) {
-  try {
-    localStorage.setItem("dmo_admins", JSON.stringify(xs));
-  } catch {}
-}
-function getPendingAdmins(): string[] {
-  return safeJsonParse<string[]>(localStorage.getItem("dmo_pending_admins"), []);
-}
-function setPendingAdmins(xs: string[]) {
-  try {
-    localStorage.setItem("dmo_pending_admins", JSON.stringify(xs));
-  } catch {}
-}
-
-function getReviews(): Review[] {
-  return safeJsonParse<Review[]>(localStorage.getItem("dmo_reviews"), []);
-}
-function setReviews(xs: Review[]) {
-  try {
-    localStorage.setItem("dmo_reviews", JSON.stringify(xs));
-  } catch {}
-}
-
-function TopNav(props: {
+function TopNav({
+  query,
+  setQuery,
+  category,
+  setCategory,
+  cartCount,
+  onOpenCart,
+  page,
+  setPage,
+  session,
+  onOpenAuth,
+  onLogout,
+}: {
   query: string;
   setQuery: (v: string) => void;
   category: string;
@@ -234,12 +279,10 @@ function TopNav(props: {
   onOpenCart: () => void;
   page: "home" | "orders" | "admin";
   setPage: (v: "home" | "orders" | "admin") => void;
-  session: Session;
+  session: Session | null;
   onOpenAuth: () => void;
   onLogout: () => void;
 }) {
-  const { query, setQuery, category, setCategory, cartCount, onOpenCart, page, setPage, session, onOpenAuth, onLogout } = props;
-
   return (
     <div className="sticky top-0 z-40">
       <div className="bg-gradient-to-r from-red-700 via-red-600 to-orange-500 text-white">
@@ -290,7 +333,11 @@ function TopNav(props: {
             </div>
           </div>
 
-          <Button onClick={onOpenCart} variant="secondary" className="relative rounded-2xl bg-white/15 hover:bg-white/20 text-white">
+          <Button
+            onClick={onOpenCart}
+            variant="secondary"
+            className="relative rounded-2xl bg-white/15 hover:bg-white/20 text-white"
+          >
             <ShoppingCart className="h-4 w-4" />
             <span className="ml-2 hidden sm:inline">Cart</span>
             {cartCount > 0 && (
@@ -318,20 +365,11 @@ function TopNav(props: {
                   <DropdownMenuItem onClick={() => setPage("orders")} className={page === "orders" ? "font-semibold" : ""}>
                     <Package className="h-4 w-4 mr-2" /> Orders
                   </DropdownMenuItem>
-
                   {session.role === "admin" && (
                     <DropdownMenuItem onClick={() => setPage("admin")} className={page === "admin" ? "font-semibold" : ""}>
                       <Settings className="h-4 w-4 mr-2" /> Admin
                     </DropdownMenuItem>
                   )}
-
-                  {session.role === "pending_admin" && (
-                    <div className="px-3 py-2 text-xs text-muted-foreground">
-                      <Clock3 className="inline h-4 w-4 mr-1" />
-                      Admin request pending (Main Admin approval needed)
-                    </div>
-                  )}
-
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={onLogout}>
                     <LogOut className="h-4 w-4 mr-2" /> Logout
@@ -364,7 +402,7 @@ function TopNav(props: {
               <Truck className="h-4 w-4" /> Fast delivery
             </div>
             <div className="flex items-center gap-1">
-              <ShieldCheck className="h-4 w-4" /> Cash on Delivery
+              <ShieldCheck className="h-4 w-4" /> Secure payments
             </div>
             <div className="flex items-center gap-1">
               <RotateCcw className="h-4 w-4" /> Easy returns
@@ -387,9 +425,7 @@ function Hero({ onShop }: { onShop: () => void }) {
               <span className="h-1.5 w-1.5 rounded-full bg-white" /> Deals updated daily
             </div>
             <h1 className="mt-4 text-2xl md:text-4xl font-black tracking-tight">Dragon Mart Online — shop smart, save big.</h1>
-            <p className="mt-3 text-white/80">
-              Search, filters, cart, login, orders, admin upload, reviews & Cash on Delivery.
-            </p>
+            <p className="mt-3 text-white/80">Amazon-style UI with search, filters, cart, login, orders, and admin upload.</p>
             <div className="mt-5 flex gap-2">
               <Button onClick={onShop} className="rounded-2xl bg-white text-zinc-900 hover:bg-white/90">
                 Shop now
@@ -401,7 +437,7 @@ function Hero({ onShop }: { onShop: () => void }) {
           </div>
           <div className="rounded-3xl bg-white/10 p-4">
             <div className="grid grid-cols-2 gap-3">
-              {["Prime picks", "Top rated", "Luggage & Bags", "New arrivals"].map((t) => (
+              {["Prime picks", "Top rated", "Home refresh", "New arrivals"].map((t) => (
                 <div key={t} className="rounded-2xl bg-white/10 p-4 text-sm font-semibold">
                   {t}
                   <div className="mt-2 text-xs font-normal text-white/70">Save up to 40%</div>
@@ -471,7 +507,14 @@ function sortLabel(sort: string) {
   return "Featured";
 }
 
-function FiltersBar(props: {
+function FiltersBar({
+  sort,
+  setSort,
+  onlyPrime,
+  setOnlyPrime,
+  priceMax,
+  setPriceMax,
+}: {
   sort: string;
   setSort: (v: string) => void;
   onlyPrime: boolean;
@@ -479,8 +522,6 @@ function FiltersBar(props: {
   priceMax: number;
   setPriceMax: React.Dispatch<React.SetStateAction<number>>;
 }) {
-  const { sort, setSort, onlyPrime, setOnlyPrime, priceMax, setPriceMax } = props;
-
   return (
     <div className="mx-auto max-w-6xl px-4 mt-6">
       <div className="flex flex-col md:flex-row md:items-center gap-3">
@@ -490,7 +531,11 @@ function FiltersBar(props: {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant={onlyPrime ? "default" : "secondary"} className="rounded-2xl" onClick={() => setOnlyPrime((v) => !v)}>
+          <Button
+            variant={onlyPrime ? "default" : "secondary"}
+            className="rounded-2xl"
+            onClick={() => setOnlyPrime((v) => !v)}
+          >
             Prime
           </Button>
 
@@ -507,7 +552,11 @@ function FiltersBar(props: {
                 { id: "price_desc", label: "Price: High to Low" },
                 { id: "rating_desc", label: "Rating" },
               ].map((o) => (
-                <DropdownMenuItem key={o.id} onClick={() => setSort(o.id)} className={o.id === sort ? "font-semibold" : ""}>
+                <DropdownMenuItem
+                  key={o.id}
+                  onClick={() => setSort(o.id)}
+                  className={o.id === sort ? "font-semibold" : ""}
+                >
                   {o.label}
                 </DropdownMenuItem>
               ))}
@@ -525,7 +574,16 @@ function FiltersBar(props: {
   );
 }
 
-function CartSheet(props: {
+function CartSheet({
+  open,
+  setOpen,
+  items,
+  onInc,
+  onDec,
+  onRemove,
+  total,
+  onCheckout,
+}: {
   open: boolean;
   setOpen: (v: boolean) => void;
   items: { product: Product; qty: number }[];
@@ -535,8 +593,6 @@ function CartSheet(props: {
   total: number;
   onCheckout: () => void;
 }) {
-  const { open, setOpen, items, onInc, onDec, onRemove, total, onCheckout } = props;
-
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetContent className="w-full sm:max-w-md">
@@ -586,9 +642,9 @@ function CartSheet(props: {
           </div>
           <div className="mt-3">
             <Button className="w-full rounded-2xl" disabled={items.length === 0} onClick={onCheckout}>
-              Place Order (Cash on Delivery)
+              Place order (Cash on Delivery)
             </Button>
-            <div className="mt-2 text-xs text-muted-foreground">Payment method: Cash on Delivery (COD)</div>
+            <div className="mt-2 text-xs text-muted-foreground">Payment method: COD (demo). Add payment gateway later.</div>
           </div>
         </div>
       </SheetContent>
@@ -596,54 +652,132 @@ function CartSheet(props: {
   );
 }
 
-function toYouTubeEmbed(url: string) {
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) {
-      const id = u.pathname.replace("/", "");
-      return id ? `https://www.youtube.com/embed/${id}` : null;
-    }
-    if (u.hostname.includes("youtube.com")) {
-      const id = u.searchParams.get("v");
-      return id ? `https://www.youtube.com/embed/${id}` : null;
-    }
-    return null;
-  } catch {
-    return null;
-  }
+function ReviewsSection({
+  product,
+  reviews,
+  session,
+  onSubmit,
+}: {
+  product: Product;
+  reviews: ProductReview[];
+  session: Session | null;
+  onSubmit: (rating: number, comment: string) => void;
+}) {
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState("");
+
+  const already = useMemo(() => {
+    if (!session) return false;
+    return reviews.some((r) => r.userEmail.toLowerCase() === session.email.toLowerCase());
+  }, [reviews, session]);
+
+  return (
+    <div className="mt-6">
+      <div className="text-sm font-black">Ratings & Comments</div>
+      <div className="mt-2 space-y-3">
+        {reviews.length === 0 ? (
+          <div className="text-sm text-muted-foreground">No reviews yet. Be the first!</div>
+        ) : (
+          reviews
+            .slice()
+            .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+            .slice(0, 20)
+            .map((r) => (
+              <div key={r.id} className="rounded-2xl border p-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold">{r.userName}</div>
+                  <div className="text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</div>
+                </div>
+                <div className="mt-1 flex items-center gap-2">
+                  <Stars value={r.rating} />
+                  <span className="text-xs text-muted-foreground">{r.rating}/5</span>
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{r.comment}</div>
+              </div>
+            ))
+        )}
+
+        <div className="rounded-2xl border p-3">
+          {!session ? (
+            <div className="text-sm text-muted-foreground">Login to rate and comment.</div>
+          ) : already ? (
+            <div className="text-sm text-muted-foreground">You already submitted a review for this product.</div>
+          ) : (
+            <div className="space-y-2">
+              <div className="text-sm font-semibold">Your rating</div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={rating}
+                  onChange={(e) => setRating(Number(e.target.value))}
+                  className="h-10 rounded-2xl border bg-background px-3 text-sm"
+                >
+                  {[5, 4, 3, 2, 1].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+                <Stars value={rating} />
+              </div>
+              <div className="text-sm font-semibold">Comment</div>
+              <textarea
+                className="w-full rounded-2xl border bg-background px-3 py-2 text-sm min-h-24"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Write your comment..."
+              />
+              <Button
+                className="rounded-2xl"
+                onClick={() => {
+                  const c = comment.trim();
+                  if (!c) return;
+                  onSubmit(clamp(rating, 1, 5), c);
+                  setComment("");
+                  setRating(5);
+                }}
+              >
+                Submit review
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function ProductDialog(props: {
+function ProductDialog({
+  open,
+  setOpen,
+  product,
+  onAdd,
+  session,
+  allReviews,
+  onAddReview,
+}: {
   open: boolean;
   setOpen: (v: boolean) => void;
   product: Product | null;
   onAdd: (p: Product) => void;
-  session: Session;
-  reviewsByProduct: Record<string, Review[]>;
-  onSubmitReview: (productId: string, rating: number, comment: string) => void;
+  session: Session | null;
+  allReviews: ProductReview[];
+  onAddReview: (productId: string, rating: number, comment: string) => void;
 }) {
-  const { open, setOpen, product, onAdd, session, reviewsByProduct, onSubmitReview } = props;
-
   const gallery = product?.images?.length ? product.images : product ? [product.img] : [];
   const videos = product?.videos?.length ? product.videos : [];
   const [activeIdx, setActiveIdx] = useState(0);
 
-  const [myRating, setMyRating] = useState<number>(5);
-  const [myComment, setMyComment] = useState("");
-
   useEffect(() => {
     setActiveIdx(0);
-    setMyRating(5);
-    setMyComment("");
   }, [product?.id]);
 
   if (!product) return null;
 
-  const list = reviewsByProduct[product.id] || [];
+  const productReviews = allReviews.filter((r) => r.productId === product.id);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-4xl rounded-3xl">
+      <DialogContent className="max-w-3xl rounded-3xl">
         <DialogHeader>
           <DialogTitle className="text-lg font-black">{product.title}</DialogTitle>
         </DialogHeader>
@@ -703,111 +837,35 @@ function ProductDialog(props: {
           <div>
             <div className="flex items-center gap-2">
               <Stars value={product.rating} />
-              <span className="text-sm text-muted-foreground">
-                {product.rating.toFixed(1)} • {product.reviews.toLocaleString()} reviews
-              </span>
+              <span className="text-sm text-muted-foreground">{product.rating.toFixed(1)} • {product.reviews.toLocaleString()} reviews</span>
             </div>
 
             <div className="mt-3 text-2xl font-black">{formatMoneyAED(product.price)}</div>
 
             <div className="mt-3 flex gap-2 flex-wrap">
               {product.prime && <Badge className="rounded-full">Prime</Badge>}
-              <Badge variant="secondary" className="rounded-full">
-                {product.category}
-              </Badge>
+              <Badge variant="secondary" className="rounded-full">{product.category}</Badge>
               <Badge variant={product.stock > 10 ? "secondary" : "destructive"} className="rounded-full">
                 {product.stock > 10 ? "In stock" : "Limited"}
               </Badge>
-              <Badge className="rounded-full">COD</Badge>
             </div>
 
             <p className="mt-4 text-sm text-muted-foreground leading-relaxed">{product.desc}</p>
 
             <div className="mt-5 grid gap-2">
-              <Button className="rounded-2xl" onClick={() => onAdd(product)}>
-                Add to cart
-              </Button>
+              <Button className="rounded-2xl" onClick={() => onAdd(product)}>Add to cart</Button>
               <Button variant="secondary" className="rounded-2xl" onClick={() => onAdd(product)}>
                 Buy now (COD)
               </Button>
-              <div className="mt-2 text-xs text-muted-foreground">Payment: Cash on Delivery</div>
+              <div className="mt-2 text-xs text-muted-foreground">Payment: Cash on Delivery active now. You can add Stripe / Tap / PayTabs later from a server checkout route.</div>
             </div>
 
-            {/* Reviews */}
-            <div className="mt-6 border rounded-3xl p-4">
-              <div className="flex items-center justify-between">
-                <div className="font-black">Ratings & Comments</div>
-                <Badge variant="secondary" className="rounded-full">
-                  {list.length} comment{list.length === 1 ? "" : "s"}
-                </Badge>
-              </div>
-
-              {!session ? (
-                <div className="mt-3 text-sm text-muted-foreground">Review দিতে হলে আগে Login করুন।</div>
-              ) : (
-                <div className="mt-3 space-y-2">
-                  <div className="text-sm font-semibold">Your rating</div>
-                  <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <button
-                        key={n}
-                        onClick={() => setMyRating(n)}
-                        className={`h-10 w-10 rounded-2xl border grid place-items-center ${
-                          myRating >= n ? "bg-orange-500 text-white border-orange-500" : "bg-white"
-                        }`}
-                        title={`${n} star`}
-                      >
-                        <Star className="h-4 w-4" />
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="text-sm font-semibold">Comment</div>
-                  <textarea
-                    className="w-full rounded-2xl border bg-background px-3 py-2 text-sm min-h-20"
-                    value={myComment}
-                    onChange={(e) => setMyComment(e.target.value)}
-                    placeholder="Write your comment..."
-                  />
-
-                  <Button
-                    className="rounded-2xl"
-                    onClick={() => {
-                      const c = myComment.trim();
-                      if (!c) return;
-                      onSubmitReview(product.id, myRating, c);
-                      setMyComment("");
-                    }}
-                  >
-                    Submit review
-                  </Button>
-                </div>
-              )}
-
-              <div className="mt-4 space-y-3 max-h-56 overflow-auto pr-1">
-                {list.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">এখনো কোন কমেন্ট নেই।</div>
-                ) : (
-                  list
-                    .slice()
-                    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-                    .map((r) => (
-                      <div key={r.id} className="rounded-2xl border p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-sm font-semibold line-clamp-1">{r.userName}</div>
-                          <div className="text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</div>
-                        </div>
-                        <div className="mt-1 flex items-center gap-2">
-                          <Stars value={r.rating} />
-                          <span className="text-xs text-muted-foreground">{r.rating}/5</span>
-                        </div>
-                        <div className="mt-2 text-sm">{r.comment}</div>
-                      </div>
-                    ))
-                )}
-              </div>
-            </div>
-            {/* end reviews */}
+            <ReviewsSection
+              product={product}
+              reviews={productReviews}
+              session={session}
+              onSubmit={(rating, comment) => onAddReview(product.id, rating, comment)}
+            />
           </div>
         </div>
       </DialogContent>
@@ -815,62 +873,85 @@ function ProductDialog(props: {
   );
 }
 
-function AuthDialog(props: { open: boolean; setOpen: (v: boolean) => void; setSession: (s: Session) => void }) {
-  const { open, setOpen, setSession } = props;
-
+function AuthDialog({
+  open,
+  setOpen,
+  setSession,
+  pendingAdmins,
+  setPendingAdmins,
+}: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  setSession: (s: Session | null) => void;
+  pendingAdmins: PendingAdmin[];
+  setPendingAdmins: React.Dispatch<React.SetStateAction<PendingAdmin[]>>;
+}) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [name, setName] = useState("Hanif");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [requestAdmin, setRequestAdmin] = useState(false);
-  const [msg, setMsg] = useState<string>("");
+  const [wantAdmin, setWantAdmin] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
-      setMsg("");
+      setErr(null);
       setMode("login");
-      setRequestAdmin(false);
+      setWantAdmin(false);
     }
   }, [open]);
 
-  function doLoginOrSignup() {
+  function submit() {
+    setErr(null);
     const e = email.trim().toLowerCase();
-    const p = password;
+    const n = name.trim() || "User";
 
-    if (!e || !p) {
-      setMsg("Email এবং password দিন।");
+    if (!e || !password) {
+      setErr("Email এবং Password দিতে হবে");
       return;
     }
 
-    // ✅ Main admin exact login
-    if (e === MAIN_ADMIN_EMAIL.toLowerCase() && p === MAIN_ADMIN_PASSWORD) {
-      const admins = Array.from(new Set([MAIN_ADMIN_EMAIL.toLowerCase(), ...getApprovedAdmins().map((x) => x.toLowerCase())]));
-      setApprovedAdmins(admins);
-      setSession({ id: "main_admin", name: name || "Main Admin", email: e, role: "admin" });
+    // Main admin hardcoded (demo)
+    if (mode === "login" && e === MAIN_ADMIN_EMAIL.toLowerCase()) {
+      if (password !== MAIN_ADMIN_PASSWORD) {
+        setErr("Main admin password ভুল");
+        return;
+      }
+      setSession({ id: "main_admin", name: "Hanif (Main Admin)", email: MAIN_ADMIN_EMAIL, role: "admin" });
       setOpen(false);
       return;
     }
 
-    // approved admins login (password demo)
-    const approved = getApprovedAdmins().map((x) => x.toLowerCase());
-    if (approved.includes(e) && p.length > 0) {
-      setSession({ id: `user_${e}`, name: name || "Admin", email: e, role: "admin" });
+    if (mode === "login") {
+      // Demo login for others: password not verified (front-end demo)
+      const role: Role = wantAdmin ? "pending_admin" : "customer";
+      if (role === "pending_admin") {
+        // add to pending list (if not already)
+        const exists = pendingAdmins.some((p) => p.email.toLowerCase() === e);
+        if (!exists) {
+          setPendingAdmins((xs) => [{ id: uid("pending"), name: n, email: e, createdAt: new Date().toISOString() }, ...xs]);
+        }
+        setSession({ id: uid("user"), name: n, email: e, role: "pending_admin" });
+      } else {
+        setSession({ id: uid("user"), name: n, email: e, role: "customer" });
+      }
       setOpen(false);
       return;
     }
 
-    // if requesting admin but not approved: pending
-    if (requestAdmin) {
-      const pending = getPendingAdmins().map((x) => x.toLowerCase());
-      if (!pending.includes(e)) setPendingAdmins([...getPendingAdmins(), e]);
-      setSession({ id: `user_${e}`, name: name || "User", email: e, role: "pending_admin" });
-      setMsg("আপনার Admin request pending হয়েছে। Main Admin approve করলে Admin হবে।");
-      // keep dialog open so user can read message
+    // signup (same behavior)
+    const role: Role = wantAdmin ? "pending_admin" : "customer";
+    if (role === "pending_admin") {
+      const exists = pendingAdmins.some((p) => p.email.toLowerCase() === e);
+      if (!exists) {
+        setPendingAdmins((xs) => [{ id: uid("pending"), name: n, email: e, createdAt: new Date().toISOString() }, ...xs]);
+      }
+      setSession({ id: uid("user"), name: n, email: e, role: "pending_admin" });
+      setOpen(false);
       return;
     }
 
-    // normal customer
-    setSession({ id: `user_${e}`, name: name || "User", email: e, role: "customer" });
+    setSession({ id: uid("user"), name: n, email: e, role: "customer" });
     setOpen(false);
   }
 
@@ -882,14 +963,23 @@ function AuthDialog(props: { open: boolean; setOpen: (v: boolean) => void; setSe
         </DialogHeader>
 
         <div className="space-y-3">
-          <div>
-            <div className="text-sm font-semibold">Full name</div>
-            <Input className="rounded-2xl" value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
+          {mode === "signup" && (
+            <div>
+              <div className="text-sm font-semibold">Full name</div>
+              <Input className="rounded-2xl" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+          )}
+
+          {mode === "login" && (
+            <div>
+              <div className="text-sm font-semibold">Name (optional)</div>
+              <Input className="rounded-2xl" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+          )}
 
           <div>
             <div className="text-sm font-semibold">Email</div>
-            <Input className="rounded-2xl" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" />
+            <Input className="rounded-2xl" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
 
           <div>
@@ -898,18 +988,18 @@ function AuthDialog(props: { open: boolean; setOpen: (v: boolean) => void; setSe
           </div>
 
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={requestAdmin} onChange={(e) => setRequestAdmin(e.target.checked)} />
-            Request admin access (Main Admin approval needed)
+            <input type="checkbox" checked={wantAdmin} onChange={(e) => setWantAdmin(e.target.checked)} />
+            I want admin access (needs approval)
           </label>
 
-          {msg && <div className="rounded-2xl border p-3 text-sm text-muted-foreground">{msg}</div>}
+          {err && <div className="text-sm text-red-600">{err}</div>}
 
-          <Button className="w-full rounded-2xl" onClick={doLoginOrSignup}>
+          <Button className="w-full rounded-2xl" onClick={submit}>
             {mode === "login" ? "Login" : "Sign up"}
           </Button>
 
           <div className="text-xs text-muted-foreground">
-            Main Admin: <b>{MAIN_ADMIN_EMAIL}</b> (only this email can approve admins)
+            Demo: Main Admin = {MAIN_ADMIN_EMAIL}. Other admin requests will be pending until approved by Main Admin.
           </div>
 
           <div className="flex justify-between text-sm">
@@ -933,7 +1023,7 @@ function OrdersPage({ orders }: { orders: Order[] }) {
       <div className="mt-5 grid gap-4">
         {orders.length === 0 ? (
           <Card className="rounded-3xl">
-            <CardContent className="p-5 text-sm text-muted-foreground">No orders yet. Place a COD order to see history.</CardContent>
+            <CardContent className="p-5 text-sm text-muted-foreground">No orders yet. Place a COD order to see it here.</CardContent>
           </Card>
         ) : (
           orders.map((o) => (
@@ -946,7 +1036,7 @@ function OrdersPage({ orders }: { orders: Order[] }) {
               </CardHeader>
               <CardContent className="p-5 pt-0">
                 <div className="text-sm text-muted-foreground">Placed: {new Date(o.createdAt).toLocaleString()}</div>
-                <div className="mt-1 text-xs text-muted-foreground">Payment: Cash on Delivery</div>
+                <div className="mt-1 text-sm text-muted-foreground">Payment: COD</div>
                 <div className="mt-2 font-black text-lg">{formatMoneyAED(o.total)}</div>
                 <div className="mt-3 grid gap-2">
                   {o.items.map((it) => (
@@ -965,26 +1055,21 @@ function OrdersPage({ orders }: { orders: Order[] }) {
   );
 }
 
-// file -> base64
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result || ""));
-    r.onerror = () => reject(new Error("File read failed"));
-    r.readAsDataURL(file);
-  });
-}
-
-function AdminPage(props: {
+function AdminPage({
+  products,
+  onCreateProduct,
+  onDeleteProduct,
+  pendingAdmins,
+  onApproveAdmin,
+  onRejectAdmin,
+}: {
   products: Product[];
   onCreateProduct: (p: Product) => void;
   onDeleteProduct: (id: string) => void;
-  session: Session;
+  pendingAdmins: PendingAdmin[];
+  onApproveAdmin: (email: string) => void;
+  onRejectAdmin: (email: string) => void;
 }) {
-  const { products, onCreateProduct, onDeleteProduct, session } = props;
-
-  const isMainAdmin = session?.email?.toLowerCase() === MAIN_ADMIN_EMAIL.toLowerCase();
-
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Electronics");
   const [price, setPrice] = useState<number>(99);
@@ -994,12 +1079,11 @@ function AdminPage(props: {
   const [imgUrl, setImgUrl] = useState(
     "https://images.unsplash.com/photo-1518441902117-f0a9e9f8d1d4?auto=format&fit=crop&w=1200&q=60"
   );
+  const [imgFileName, setImgFileName] = useState<string | null>(null);
 
   const [extraImages, setExtraImages] = useState<string[]>([]);
   const [videos, setVideos] = useState<string[]>([]);
   const [desc, setDesc] = useState("New product description...");
-
-  const fileRef = useRef<HTMLInputElement | null>(null);
 
   function addImageField() {
     setExtraImages((xs) => [...xs, ""]);
@@ -1021,12 +1105,11 @@ function AdminPage(props: {
     setVideos((xs) => xs.filter((_, idx) => idx !== i));
   }
 
-  async function onPickMainImage(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const dataUrl = await fileToDataUrl(f);
+  async function onPickMainImage(file: File | null) {
+    if (!file) return;
+    const dataUrl = await fileToDataUrl(file);
     setImgUrl(dataUrl);
-    e.target.value = "";
+    setImgFileName(file.name);
   }
 
   function submit() {
@@ -1036,8 +1119,8 @@ function AdminPage(props: {
     const cleanedVideos = videos.map((s) => (s || "").trim()).filter(Boolean);
 
     onCreateProduct({
-      id: `p_${Math.random().toString(16).slice(2)}`,
-      title,
+      id: uid("p"),
+      title: title.trim(),
       category,
       price: Number(price),
       rating: 0,
@@ -1047,33 +1130,12 @@ function AdminPage(props: {
       img: imgUrl,
       images: cleanedImages,
       videos: cleanedVideos,
-      desc,
+      desc: desc.trim() || "-",
     });
 
     setTitle("");
     setExtraImages([]);
     setVideos([]);
-  }
-
-  // admin approvals
-  const [pending, setPending] = useState<string[]>(() => getPendingAdmins());
-
-  function refreshPending() {
-    setPending(getPendingAdmins());
-  }
-
-  function approveAdmin(email: string) {
-    const e = email.toLowerCase();
-    const nextApproved = Array.from(new Set([...getApprovedAdmins().map((x) => x.toLowerCase()), e]));
-    setApprovedAdmins(nextApproved);
-    setPendingAdmins(getPendingAdmins().filter((x) => x.toLowerCase() !== e));
-    refreshPending();
-  }
-
-  function denyAdmin(email: string) {
-    const e = email.toLowerCase();
-    setPendingAdmins(getPendingAdmins().filter((x) => x.toLowerCase() !== e));
-    refreshPending();
   }
 
   return (
@@ -1083,42 +1145,51 @@ function AdminPage(props: {
           <div className="text-sm text-muted-foreground">Admin</div>
           <div className="text-2xl font-black">Product Upload</div>
         </div>
-        <Badge variant="secondary" className="rounded-full">
-          {isMainAdmin ? "Main Admin" : "Admin"}
-        </Badge>
+        <Badge variant="secondary" className="rounded-full">Main admin</Badge>
       </div>
 
-      {/* Main Admin Approval Panel */}
-      {isMainAdmin && (
-        <Card className="rounded-3xl mt-4">
+      {pendingAdmins.length > 0 && (
+        <Card className="rounded-3xl mt-5">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2"><Settings className="h-5 w-5" /> Real ecommerce migration</span>
+              <Button variant="secondary" className="rounded-2xl" onClick={() => setBackendMode(true)}>
+                Mark Backend Ready
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-5 pt-0 text-sm text-muted-foreground">
+            This admin panel is already prepared for a real ecommerce upgrade. Next step is connecting Supabase Auth, Products, Orders, Reviews and Admin tables.
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl mt-5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5" /> Admin Approval Requests
+              <Settings className="h-5 w-5" /> Admin approval requests
             </CardTitle>
           </CardHeader>
           <CardContent className="p-5 pt-0">
-            {pending.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No pending admin requests.</div>
-            ) : (
-              <div className="space-y-2">
-                {pending.map((e) => (
-                  <div key={e} className="flex items-center justify-between gap-2 rounded-2xl border p-3">
-                    <div className="text-sm font-semibold">{e}</div>
-                    <div className="flex gap-2">
-                      <Button className="rounded-2xl" onClick={() => approveAdmin(e)}>
-                        Approve
-                      </Button>
-                      <Button variant="secondary" className="rounded-2xl" onClick={() => denyAdmin(e)}>
-                        Deny
-                      </Button>
-                    </div>
+            <div className="grid gap-3">
+              {pendingAdmins.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-3 rounded-2xl border p-3">
+                  <div>
+                    <div className="text-sm font-semibold">{p.name}</div>
+                    <div className="text-xs text-muted-foreground">{p.email}</div>
+                    <div className="text-xs text-muted-foreground">Requested: {new Date(p.createdAt).toLocaleString()}</div>
                   </div>
-                ))}
-                <Button variant="ghost" className="rounded-2xl" onClick={refreshPending}>
-                  Refresh
-                </Button>
-              </div>
-            )}
+                  <div className="flex gap-2">
+                    <Button className="rounded-2xl" onClick={() => onApproveAdmin(p.email)}>
+                      <Check className="h-4 w-4" /> Approve
+                    </Button>
+                    <Button variant="secondary" className="rounded-2xl" onClick={() => onRejectAdmin(p.email)}>
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 text-xs text-muted-foreground">Approving an admin saves them in a local allow-list.</div>
           </CardContent>
         </Card>
       )}
@@ -1168,21 +1239,23 @@ function AdminPage(props: {
               </label>
             </div>
 
-            {/* ✅ Main image: Upload button + URL */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold">Main Image</div>
-                <div className="flex gap-2">
-                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickMainImage} />
-                  <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => fileRef.current?.click()}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Image
-                  </Button>
-                </div>
+              <div className="text-sm font-semibold">Main Product Image</div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input className="rounded-2xl" value={imgUrl} onChange={(e) => { setImgUrl(e.target.value); setImgFileName(null); }} placeholder="Paste image URL OR use Browse" />
+                <label className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 h-10 border cursor-pointer">
+                  <Upload className="h-4 w-4" /> Browse
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => onPickMainImage(e.target.files?.[0] || null)}
+                  />
+                </label>
               </div>
-              <Input className="rounded-2xl" value={imgUrl} onChange={(e) => setImgUrl(e.target.value)} placeholder="Paste image URL or use Upload button" />
-              <div className="rounded-2xl border p-2">
-                <img src={imgUrl} alt="preview" className="h-40 w-full object-cover rounded-2xl" />
+              {imgFileName && <div className="text-xs text-muted-foreground">Selected: {imgFileName}</div>}
+              <div className="rounded-2xl border overflow-hidden">
+                <img src={imgUrl} alt="preview" className="h-40 w-full object-cover" />
               </div>
             </div>
 
@@ -1190,7 +1263,7 @@ function AdminPage(props: {
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold">More Pictures (multiple)</div>
                 <Button type="button" variant="secondary" className="rounded-2xl" onClick={addImageField}>
-                  + Add Picture URL
+                  + Add
                 </Button>
               </div>
               {extraImages.length === 0 ? (
@@ -1199,7 +1272,12 @@ function AdminPage(props: {
                 <div className="space-y-2">
                   {extraImages.map((val, i) => (
                     <div key={`img_${i}`} className="flex gap-2">
-                      <Input placeholder="https://...jpg" value={val} onChange={(e) => updateImageField(i, e.target.value)} className="rounded-2xl" />
+                      <Input
+                        placeholder="https://...jpg"
+                        value={val}
+                        onChange={(e) => updateImageField(i, e.target.value)}
+                        className="rounded-2xl"
+                      />
                       <Button type="button" variant="ghost" className="rounded-2xl" onClick={() => removeImageField(i)}>
                         Remove
                       </Button>
@@ -1213,7 +1291,7 @@ function AdminPage(props: {
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold">Videos (YouTube or .mp4)</div>
                 <Button type="button" variant="secondary" className="rounded-2xl" onClick={addVideoField}>
-                  + Add Video
+                  + Add
                 </Button>
               </div>
               {videos.length === 0 ? (
@@ -1249,7 +1327,7 @@ function AdminPage(props: {
             <Button className="rounded-2xl" onClick={submit}>
               Create product
             </Button>
-            <div className="text-xs text-muted-foreground">Demo only. Data saved in browser LocalStorage.</div>
+            <div className="text-xs text-muted-foreground">Current version saves instantly in browser. For real ecommerce, connect Supabase Storage + products table, then this same form becomes your real admin uploader.</div>
           </CardContent>
         </Card>
 
@@ -1260,22 +1338,15 @@ function AdminPage(props: {
           <CardContent className="p-5 pt-0">
             <div className="text-sm text-muted-foreground">Total products: {products.length}</div>
             <div className="mt-3 grid gap-3">
-              {products.slice(0, 10).map((p) => (
+              {products.slice(0, 12).map((p) => (
                 <div key={p.id} className="flex items-center gap-3 rounded-2xl border p-3">
-                  <Button
-                    variant="ghost"
-                    className="rounded-2xl text-red-600"
-                    onClick={() => onDeleteProduct(p.id)}
-                    title="Delete"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <button onClick={() => onDeleteProduct(p.id)} className="text-red-600 text-xs font-semibold mr-1">
+                    Delete
+                  </button>
                   <img src={p.img} alt={p.title} className="h-12 w-12 rounded-2xl object-cover" />
                   <div className="flex-1">
                     <div className="text-sm font-semibold line-clamp-1">{p.title}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {p.category} • {formatMoneyAED(p.price)}
-                    </div>
+                    <div className="text-xs text-muted-foreground">{p.category} • {formatMoneyAED(p.price)}</div>
                     <div className="text-[11px] text-muted-foreground">
                       {(p.images?.length || 0)} photos • {(p.videos?.length || 0)} videos
                     </div>
@@ -1291,42 +1362,59 @@ function AdminPage(props: {
   );
 }
 
+// =============================
+// REAL ECOMMERCE NEXT STEP (Supabase-ready)
+// =============================
+// Supabase tables to create:
+// products(id uuid, title text, category text, price numeric, rating numeric, reviews int, prime boolean, stock int, img text, images jsonb, videos jsonb, desc text, created_at timestamptz)
+// reviews(id uuid, product_id uuid, user_email text, user_name text, rating int, comment text, created_at timestamptz)
+// orders(id uuid, user_email text, status text, payment_method text, total numeric, items jsonb, created_at timestamptz)
+// admin_requests(id uuid, name text, email text, created_at timestamptz)
+// approved_admins(id uuid, email text unique, created_at timestamptz)
+// profiles(id uuid, email text unique, full_name text, role text, created_at timestamptz)
+// Env:
+// NEXT_PUBLIC_SUPABASE_URL=your_url
+// NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+// Install: npm i @supabase/supabase-js
+// Then replace localStorage calls with Supabase queries.
+
 export default function DragonMartOnline() {
   const { session, setSession } = useSession();
 
-  const [page, setPage] = useState<"home" | "orders" | "admin">("home");
+  const [page, setPage] = useLocalStorageState<"home" | "orders" | "admin">("dmo_page", "home");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [sort, setSort] = useState<"featured" | "price_asc" | "price_desc" | "rating_desc">("featured");
   const [onlyPrime, setOnlyPrime] = useState(false);
   const [priceMax, setPriceMax] = useState(1500);
 
-  const [products, setProducts] = useState<Product[]>(() => safeJsonParse<Product[]>(localStorage.getItem("dmo_products"), DEMO_PRODUCTS));
+  const [products, setProducts] = useLocalStorageState<Product[]>("dmo_products", DEMO_PRODUCTS);
   const [cartOpen, setCartOpen] = useState(false);
-  const [cart, setCart] = useState<Record<string, number>>(() => safeJsonParse(localStorage.getItem("dmo_cart"), {} as Record<string, number>));
-  const [orders, setOrders] = useState<Order[]>(() => safeJsonParse<Order[]>(localStorage.getItem("dmo_orders"), []));
+  const [cart, setCart] = useLocalStorageState<Record<string, number>>("dmo_cart", {});
+  const [orders, setOrders] = useLocalStorageState<Order[]>("dmo_orders", []);
 
   const [quickOpen, setQuickOpen] = useState(false);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+
   const [authOpen, setAuthOpen] = useState(false);
 
-  const [reviews, setReviewsState] = useState<Review[]>(() => getReviews());
+  const [reviews, setReviews] = useLocalStorageState<ProductReview[]>("dmo_reviews", []);
 
-  useEffect(() => {
-    try { localStorage.setItem("dmo_cart", JSON.stringify(cart)); } catch {}
-  }, [cart]);
+  // Admin approval system (demo)
+  const [pendingAdmins, setPendingAdmins] = useLocalStorageState<PendingAdmin[]>("dmo_pending_admins", []);
+  const [approvedAdminEmails, setApprovedAdminEmails] = useLocalStorageState<string[]>("dmo_admin_allowlist", [MAIN_ADMIN_EMAIL.toLowerCase()]);
+  const [backendMode, setBackendMode] = useLocalStorageState<boolean>("dmo_backend_mode", false);
 
+  // Upgrade role after approval
   useEffect(() => {
-    try { localStorage.setItem("dmo_orders", JSON.stringify(orders)); } catch {}
-  }, [orders]);
-
-  useEffect(() => {
-    try { localStorage.setItem("dmo_products", JSON.stringify(products)); } catch {}
-  }, [products]);
-
-  useEffect(() => {
-    setReviews(reviews);
-  }, [reviews]);
+    if (!session) return;
+    if (session.role === "pending_admin") {
+      const ok = approvedAdminEmails.includes(session.email.toLowerCase());
+      if (ok) {
+        setSession({ ...session, role: "admin" });
+      }
+    }
+  }, [approvedAdminEmails, session, setSession]);
 
   const cartCount = useMemo(() => Object.values(cart).reduce((a, b) => a + b, 0), [cart]);
 
@@ -1334,19 +1422,10 @@ export default function DragonMartOnline() {
     const map = new Map(products.map((p) => [p.id, p] as const));
     return Object.entries(cart)
       .map(([id, qty]) => ({ product: map.get(id), qty }))
-      .filter((x): x is { product: Product; qty: number } => Boolean(x.product));
+      .filter((x) => x.product) as { product: Product; qty: number }[];
   }, [cart, products]);
 
   const subtotal = useMemo(() => cartItems.reduce((sum, { product, qty }) => sum + product.price * qty, 0), [cartItems]);
-
-  const reviewsByProduct = useMemo(() => {
-    const m: Record<string, Review[]> = {};
-    for (const r of reviews) {
-      if (!m[r.productId]) m[r.productId] = [];
-      m[r.productId].push(r);
-    }
-    return m;
-  }, [reviews]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -1364,10 +1443,11 @@ export default function DragonMartOnline() {
 
     if (sort === "featured") {
       list = list
-        .map((p) => ({ p, s: (p.rating || 0) * 10 + clamp(p.stock, 0, 50) / 10 }))
+        .map((p) => ({ p, s: p.rating * 10 + clamp(p.stock, 0, 50) / 10 }))
         .sort((a, b) => b.s - a.s)
         .map((x) => x.p);
     }
+
     return list;
   }, [query, category, sort, onlyPrime, priceMax, products]);
 
@@ -1375,9 +1455,11 @@ export default function DragonMartOnline() {
     setCart((c) => ({ ...c, [p.id]: (c[p.id] || 0) + 1 }));
     setCartOpen(true);
   }
+
   function inc(id: string) {
     setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }));
   }
+
   function dec(id: string) {
     setCart((c) => {
       const next = { ...c };
@@ -1387,6 +1469,7 @@ export default function DragonMartOnline() {
       return next;
     });
   }
+
   function remove(id: string) {
     setCart((c) => {
       const next = { ...c };
@@ -1408,15 +1491,16 @@ export default function DragonMartOnline() {
   function createProduct(p: Product) {
     setProducts((prev) => [p, ...prev]);
   }
+
   function deleteProduct(id: string) {
     setProducts((prev) => prev.filter((p) => p.id !== id));
   }
 
-  function submitReview(productId: string, rating: number, comment: string) {
+  function addReview(productId: string, rating: number, comment: string) {
     if (!session) return;
 
-    const r: Review = {
-      id: `r_${Math.random().toString(16).slice(2)}`,
+    const r: ProductReview = {
+      id: uid("rev"),
       productId,
       userEmail: session.email,
       userName: session.name,
@@ -1425,24 +1509,29 @@ export default function DragonMartOnline() {
       createdAt: new Date().toISOString(),
     };
 
-    const nextReviews = [...reviews, r];
-    setReviewsState(nextReviews);
+    setReviews((prev) => [r, ...prev]);
 
-    // update product avg rating + count based on stored reviews
-    const list = nextReviews.filter((x) => x.productId === productId);
-    const avg = list.reduce((s, x) => s + x.rating, 0) / Math.max(list.length, 1);
+    // Recalculate product rating from all reviews
+    setProducts((prev) => {
+      const next = prev.map((p) => {
+        if (p.id !== productId) return p;
+        const all = [r, ...reviews.filter((x) => x.productId === productId)];
+        const avg = all.reduce((s, x) => s + x.rating, 0) / Math.max(all.length, 1);
+        return { ...p, rating: Number(avg.toFixed(2)), reviews: all.length };
+      });
+      return next;
+    });
+  }
 
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.id === productId
-          ? {
-              ...p,
-              rating: Number.isFinite(avg) ? Number(avg.toFixed(2)) : p.rating,
-              reviews: list.length,
-            }
-          : p
-      )
-    );
+  function approveAdmin(email: string) {
+    const e = email.toLowerCase();
+    setApprovedAdminEmails((xs) => (xs.includes(e) ? xs : [e, ...xs]));
+    setPendingAdmins((xs) => xs.filter((p) => p.email.toLowerCase() !== e));
+  }
+
+  function rejectAdmin(email: string) {
+    const e = email.toLowerCase();
+    setPendingAdmins((xs) => xs.filter((p) => p.email.toLowerCase() !== e));
   }
 
   async function checkoutCOD() {
@@ -1455,15 +1544,10 @@ export default function DragonMartOnline() {
       id: Math.floor(100000 + Math.random() * 900000).toString(),
       createdAt: new Date().toISOString(),
       status: "COD - Pending",
-      total: subtotal,
-      items: cartItems.map(({ product, qty }) => ({
-        productId: product.id,
-        title: product.title,
-        qty,
-        price: product.price,
-      })),
-      userEmail: session.email,
       paymentMethod: "COD",
+      total: subtotal,
+      items: cartItems.map(({ product, qty }) => ({ productId: product.id, title: product.title, qty, price: product.price })),
+      userEmail: session.email,
     };
 
     setOrders((o) => [order, ...o]);
@@ -1472,11 +1556,15 @@ export default function DragonMartOnline() {
     setPage("orders");
   }
 
-  // guard: only admin (not pending_admin)
-  const canAdmin = session?.role === "admin";
+  const isMainAdmin = session?.email?.toLowerCase() === MAIN_ADMIN_EMAIL.toLowerCase() && session?.role === "admin";
+  const isApprovedAdmin = session?.role === "admin" && approvedAdminEmails.includes(session.email.toLowerCase());
+  const canAccessAdmin = Boolean(isApprovedAdmin);
 
   return (
     <div className="min-h-screen bg-orange-50">
+      <div className="bg-black text-white text-xs px-4 py-2 text-center">
+        Mode: {backendMode ? "Backend Ready" : "Local Demo"} • Current checkout: Cash on Delivery • Real DB/Auth can be connected next
+      </div>
       <TopNav
         query={query}
         setQuery={setQuery}
@@ -1508,11 +1596,9 @@ export default function DragonMartOnline() {
             <div className="flex items-end justify-between gap-3">
               <div>
                 <div className="text-sm text-muted-foreground">Showing</div>
-                <div className="text-xl font-black">
-                  {filtered.length} result{filtered.length === 1 ? "" : "s"}
-                </div>
+                <div className="text-xl font-black">{filtered.length} result{filtered.length === 1 ? "" : "s"}</div>
               </div>
-              <div className="text-xs text-muted-foreground">Tip: try search “bag”, “luggage”, “prime”…</div>
+              <div className="text-xs text-muted-foreground">Tip: try search “lamp”, “book”, “prime”…</div>
             </div>
 
             <motion.div layout className="mt-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1533,9 +1619,9 @@ export default function DragonMartOnline() {
 
             <div className="mt-10 grid md:grid-cols-3 gap-4">
               {[
-                { icon: Truck, title: "Fast delivery", text: "Demo UI — you can connect real delivery later." },
-                { icon: ShieldCheck, title: "Cash on Delivery", text: "Currently COD only (as requested)." },
-                { icon: RotateCcw, title: "Easy returns", text: "Add return policy pages & order tracking later." },
+                { icon: Truck, title: "Fast delivery", text: "Prime items arrive quicker. (Demo UI)" },
+                { icon: ShieldCheck, title: "Secure checkout", text: "COD now. Add payment gateway later." },
+                { icon: RotateCcw, title: "Easy returns", text: "Add return policy pages & order tracking." },
               ].map((b) => (
                 <Card key={b.title} className="rounded-3xl">
                   <CardHeader>
@@ -1548,41 +1634,67 @@ export default function DragonMartOnline() {
               ))}
             </div>
 
-            <footer className="mt-12 text-center text-xs text-muted-foreground">
-              Dragon Mart Online — demo template (LocalStorage). Plug backend later for production.
-            </footer>
+            <footer className="mt-12 text-center text-xs text-muted-foreground">Dragon Mart Online — frontend is ready. Real ecommerce next step: Supabase Auth + Database + Storage + order dashboard.</footer>
           </div>
         </>
       )}
 
       {page === "orders" && (
-        <OrdersPage orders={orders.filter((o) => !session || o.userEmail === session.email)} />
+        <OrdersPage orders={orders.filter((o) => (!session ? true : o.userEmail === session.email))} />
       )}
 
-      {page === "admin" &&
-        (canAdmin ? (
-          <AdminPage products={products} onCreateProduct={createProduct} onDeleteProduct={deleteProduct} session={session} />
-        ) : (
-          <div className="mx-auto max-w-6xl px-4 pt-6 pb-12">
-            <Card className="rounded-3xl">
-              <CardContent className="p-6">
-                <div className="text-2xl font-black">Admin access required</div>
-                <div className="mt-2 text-sm text-muted-foreground">
-                  Please login as an admin to upload products.
-                  {session?.role === "pending_admin" ? " (Your request is pending Main Admin approval.)" : ""}
-                </div>
-                <div className="mt-4 flex gap-2">
-                  <Button className="rounded-2xl" onClick={() => setAuthOpen(true)}>
-                    Login
-                  </Button>
-                  <Button variant="secondary" className="rounded-2xl" onClick={() => setPage("home")}>
-                    Go home
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        ))}
+      {page === "admin" && (
+        <>
+          {!session ? (
+            <div className="mx-auto max-w-6xl px-4 pt-6 pb-12">
+              <Card className="rounded-3xl">
+                <CardContent className="p-6">
+                  <div className="text-2xl font-black">Admin access required</div>
+                  <div className="mt-2 text-sm text-muted-foreground">Please login as admin.</div>
+                  <div className="mt-4 flex gap-2">
+                    <Button className="rounded-2xl" onClick={() => setAuthOpen(true)}>
+                      Login
+                    </Button>
+                    <Button variant="secondary" className="rounded-2xl" onClick={() => setPage("home")}>
+                      Go home
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : !canAccessAdmin ? (
+            <div className="mx-auto max-w-6xl px-4 pt-6 pb-12">
+              <Card className="rounded-3xl">
+                <CardContent className="p-6">
+                  <div className="text-2xl font-black">Admin approval pending</div>
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    আপনার admin request এখনো approve হয়নি। Main admin ({MAIN_ADMIN_EMAIL}) approve করলে আপনি admin page access পাবেন।
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <Button variant="secondary" className="rounded-2xl" onClick={() => setPage("home")}>
+                      Go home
+                    </Button>
+                    {isMainAdmin && (
+                      <Button className="rounded-2xl" onClick={() => { /* nothing */ }}>
+                        You are main admin
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <AdminPage
+              products={products}
+              onCreateProduct={createProduct}
+              onDeleteProduct={deleteProduct}
+              pendingAdmins={isMainAdmin ? pendingAdmins : []}
+              onApproveAdmin={approveAdmin}
+              onRejectAdmin={rejectAdmin}
+            />
+          )}
+        </>
+      )}
 
       <CartSheet
         open={cartOpen}
@@ -1601,11 +1713,17 @@ export default function DragonMartOnline() {
         product={activeProduct}
         onAdd={addToCart}
         session={session}
-        reviewsByProduct={reviewsByProduct}
-        onSubmitReview={submitReview}
+        allReviews={reviews}
+        onAddReview={addReview}
       />
 
-      <AuthDialog open={authOpen} setOpen={setAuthOpen} setSession={setSession} />
+      <AuthDialog
+        open={authOpen}
+        setOpen={setAuthOpen}
+        setSession={setSession}
+        pendingAdmins={pendingAdmins}
+        setPendingAdmins={setPendingAdmins}
+      />
     </div>
   );
 }
